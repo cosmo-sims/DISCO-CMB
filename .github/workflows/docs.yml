@@ -21,12 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Check out DISCO-EB beside this repository
-        # `[tool.uv.sources]` installs discoeb from ../DISCO-EB. The branch is
-        # the repository variable DISCOEB_REF, `v2` without it.
-        run: >
-          git clone --depth 1 --branch "${{ vars.DISCOEB_REF || 'v2' }}"
-          https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true

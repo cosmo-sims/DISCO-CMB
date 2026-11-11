@@ -27,13 +27,14 @@ directly.
 ## Development
 
 The project has its own uv environment (`.venv`, Python 3.13 from
-`.python-version`). DISCO-EB is an editable path dependency from the checkout
-beside this one (`[tool.uv.sources]`); modax-solvers and numba-enzyme-cuda
-come from PyPI through it. The dev group brings pytest, `classy`, ruff, ty
+`.python-version`). DISCO-EB comes from PyPI as `disco-eb`, and
+modax-solvers and numba-enzyme-cuda through it. To work on both at once,
+point a local `[tool.uv.sources]` entry at a DISCO-EB checkout and leave it
+uncommitted. The dev group brings pytest, `classy`, ruff, ty
 and pre-commit.
 
 ```bash
-uv sync
+uv sync --extra cuda13          # or cuda12; without one JAX runs on the CPU
 uv run pytest tests --benchmark-disable
 uv run python examples/cmb_power_spectra_batch.py
 uv run ruff format && uv run ruff check --fix
@@ -59,10 +60,7 @@ markers, so edit those in the README. Keep the site under 1000 words.
 
 CI (`.github/workflows/`) mirrors modax's: `lint`, `types`, `tests`, `docs`
 (GitHub Pages) and `publish` (python-semantic-release on every push to
-`main`, then PyPI by trusted publishing as `discocmb`). Every workflow that
-installs the project first clones `cosmo-sims/DISCO-EB` to `../DISCO-EB` at
-the repository variable `DISCOEB_REF` (default `v2`), and the release build
-command does the same inside its container. `tests` runs on the runner named
+`main`, then PyPI by trusted publishing as `disco-cmb`). `tests` runs on the runner named
 by the variable `GPU_RUNNER` (else `ubuntu-latest`, where the GPU tests
 skip) and writes `discocmb-coverage.json` to the gist `COVERAGE_GIST_ID`
 with the secret `GIST_TOKEN`.

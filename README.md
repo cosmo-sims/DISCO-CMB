@@ -11,9 +11,9 @@ site does not repeat them.
   <a href="https://github.com/cosmo-sims/DISCO-CMB/actions/workflows/tests.yml"><img alt="coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Flawrenceberry%2Fb451e14a9620fabb0d49c345f13b5414%2Fraw%2Fdiscocmb-coverage.json"></a>
   <a href="https://github.com/cosmo-sims/DISCO-CMB/actions/workflows/lint.yml"><img alt="lint" src="https://github.com/cosmo-sims/DISCO-CMB/actions/workflows/lint.yml/badge.svg?branch=main"></a>
   <a href="https://github.com/cosmo-sims/DISCO-CMB/actions/workflows/types.yml"><img alt="types" src="https://github.com/cosmo-sims/DISCO-CMB/actions/workflows/types.yml/badge.svg?branch=main"></a>
-  <a href="https://pypi.org/project/discocmb/"><img alt="PyPI" src="https://img.shields.io/pypi/v/discocmb"></a>
-  <a href="https://pypi.org/project/discocmb/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/discocmb"></a>
-  <a href="https://pypi.org/project/discocmb/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/discocmb"></a>
+  <a href="https://pypi.org/project/disco-cmb/"><img alt="PyPI" src="https://img.shields.io/pypi/v/disco-cmb"></a>
+  <a href="https://pypi.org/project/disco-cmb/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/disco-cmb"></a>
+  <a href="https://pypi.org/project/disco-cmb/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/disco-cmb"></a>
   <a href="https://docs.jax.dev/"><img alt="JAX" src="https://img.shields.io/badge/JAX-compatible-3f51b5"></a>
   <a href="https://arxiv.org/abs/2311.03291"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2311.03291-b31b1b.svg"></a>
   <a href="https://www.conventionalcommits.org/en/v1.0.0/"><img alt="Conventional Commits" src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white"></a>
@@ -43,12 +43,10 @@ and explains how the pipeline fits together.
 
 <!-- start:install -->
 
-DISCO-CMB is not on PyPI yet. It needs an NVIDIA GPU and a checkout of DISCO-EB beside it, which [uv](https://docs.astral.sh/uv/) installs as a path dependency:
+DISCO-CMB needs an NVIDIA GPU. Install it from PyPI, which brings DISCO-EB with it:
 
 ```bash
-git clone --branch v2 https://github.com/cosmo-sims/DISCO-EB.git
-git clone https://github.com/cosmo-sims/DISCO-CMB.git
-cd DISCO-CMB && uv sync
+pip install "disco-cmb[cuda13]"   # or [cuda12], which Python 3.10 needs
 ```
 
 <!-- end:install -->
@@ -92,9 +90,11 @@ dl.tt  # (3, n_ell) in muK^2
 
 <!-- start:development -->
 
-The repository uses [uv](https://docs.astral.sh/uv/). After the installation above:
+The repository uses [uv](https://docs.astral.sh/uv/):
 
 ```bash
+git clone https://github.com/cosmo-sims/DISCO-CMB.git
+cd DISCO-CMB && uv sync --extra cuda13   # or --extra cuda12
 uv run pytest tests         # needs a CUDA GPU
 uv run ruff format && uv run ruff check --fix
 uv run ty check

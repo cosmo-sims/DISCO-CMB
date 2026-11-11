@@ -1,5 +1,5 @@
 [project]
-name = "discocmb"
+name = "disco-cmb"
 version = "0.1.0"
 description = "CMB angular power spectra on the GPU from DISCO-EB's Einstein-Boltzmann solve"
 readme = "README.md"
@@ -27,10 +27,17 @@ classifiers = [
 dependencies = [
     # The Einstein-Boltzmann solve, through its interface, the discoeb
     # package; DISCO-EB brings JAX, modax and the CUDA stack.
-    "discoeb",
+    "disco-eb>=2.0.0",
     "numpy",
     "scipy",
 ]
+
+[project.optional-dependencies]
+# DISCO-EB's extras, which pick JAX's CUDA build. Without one, JAX runs on
+# the CPU and the solver's GPU kernel fails to launch.
+cuda12 = ["disco-eb[cuda12]>=2.0.0"]
+# JAX's CUDA 13 build needs Python 3.11 or newer, so 3.10 needs `cuda12`.
+cuda13 = ["disco-eb[cuda13]>=2.0.0"]
 
 [project.urls]
 Documentation = "https://cosmo-sims.github.io/DISCO-CMB/"
@@ -66,10 +73,6 @@ dev = [
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
-# DISCO-EB from the sibling checkout until it is released with this interface.
-[tool.uv.sources]
-discoeb = { path = "../DISCO-EB", editable = true }
-
 # DISCO-EB's pins of the GPU stack; uv applies these from the root project only.
 [tool.uv]
 constraint-dependencies = [
@@ -92,13 +95,9 @@ allow_zero_version = true
 major_on_zero = false
 # uv.lock records the project's own version, so the build refreshes that one
 # entry and stages it with the release commit. `set -e`: the command is one
-# shell script, and without it a failed step is ignored. The release action
-# runs in a container that sees only this checkout, so the build clones the
-# DISCO-EB that `[tool.uv.sources]` expects beside it.
+# shell script, and without it a failed step is ignored.
 build_command = """
 set -e
-[ -d ../DISCO-EB ] || git clone --depth 1 --branch "${DISCOEB_REF:-v2}" \
-    https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
 python -m pip install "uv==0.13.7"
 uv lock --upgrade-package "$PACKAGE_NAME"
 git add uv.lock

@@ -34,13 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check out DISCO-EB beside this repository
-        # `[tool.uv.sources]` installs discoeb from ../DISCO-EB. The branch is
-        # the repository variable DISCOEB_REF, `v2` without it.
-        run: >
-          git clone --depth 1 --branch "${{ vars.DISCOEB_REF || 'v2' }}"
-          https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
-
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -52,7 +45,7 @@ jobs:
       - name: Install
         # The dev group brings pytest and classy, which builds CLASS from
         # source for the reference spectra.
-        run: uv sync --frozen
+        run: uv sync --frozen --extra cuda13
 
       - name: Tests
         run: >
