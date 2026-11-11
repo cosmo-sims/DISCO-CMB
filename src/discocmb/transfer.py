@@ -208,6 +208,21 @@ def lagrange_shift_stencil(tau, delta, order=SHIFT_STENCIL):
     return i0, w
 
 
+def shift_onto_chi(x, shift_idx, shift_w):
+    """``x`` of a batch, ``(n_c, ..., n_tau)``, shifted onto the shared ``chi`` grid along its last axis.
+
+    ``shift_idx`` ``(n_c, n_tau)`` and ``shift_w`` ``(n_c, n_tau, order)`` are
+    each cosmology's stencil from :func:`lagrange_shift_stencil`.
+    """
+
+    lead = (slice(None),) + (None,) * (x.ndim - 2)
+    return sum(
+        shift_w[lead + (slice(None), a)]
+        * jnp.take_along_axis(x, (shift_idx + a)[lead + (slice(None),)], axis=-1)
+        for a in range(shift_w.shape[-1])
+    )
+
+
 class ProjectionOperator(NamedTuple):
     """The shared factors of the line-of-sight projection, from :func:`projection_operator`."""
 
@@ -326,11 +341,7 @@ def theta_ell_batch(
 
     dtype = bessel.dtype
     sources = assemble_sources(channels, tau[None, None, :])  # (c, 3, k, tau)
-    shifted = sum(
-        shift_w[:, None, None, :, a]
-        * jnp.take_along_axis(sources, (shift_idx + a)[:, None, None, :], axis=3)
-        for a in range(shift_w.shape[-1])
-    ).astype(dtype)
+    shifted = shift_onto_chi(sources, shift_idx, shift_w).astype(dtype)
     n_fine = interp.shape[0]
     step = n_fine if k_chunk is None else max(1, min(int(k_chunk), n_fine))
     thetas, thetas_e = [], []

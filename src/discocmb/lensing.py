@@ -55,7 +55,12 @@ import jax.numpy as jnp
 import numpy as np
 from scipy import special
 
-from .transfer import CACHE_SIZE, primordial_spectrum, trapezoid_weights
+from .transfer import (
+    CACHE_SIZE,
+    primordial_spectrum,
+    shift_onto_chi,
+    trapezoid_weights,
+)
 
 # ---------------------------------------------------------------------------
 # 1. Lensing potential
@@ -117,14 +122,6 @@ def limber_interpolation(ells, k_values, chi):
     return weights.astype(jnp.float32)
 
 
-def _shift(phi, shift_idx, shift_w):
-    return sum(
-        shift_w[:, None, :, a]
-        * jnp.take_along_axis(phi, (shift_idx + a)[:, None, :], axis=2)
-        for a in range(shift_w.shape[-1])
-    )  # (c, k, chi)
-
-
 def _lensing_kernel(chi, chi_star):
     chi_s = chi_star[:, None]
     return jnp.where(
@@ -167,7 +164,7 @@ def lensing_potential_transfer(
     """
 
     hi = jax.lax.Precision.HIGHEST
-    shifted = _shift(phi, shift_idx, shift_w)
+    shifted = shift_onto_chi(phi, shift_idx, shift_w)  # (c, k, chi)
     kernel = _lensing_kernel(chi, chi_star)
     source = -2.0 * kernel[:, None, :] * shifted  # (c, k, chi)
     theta = jnp.einsum(
