@@ -55,7 +55,7 @@ import jax.numpy as jnp
 import numpy as np
 from scipy import special
 
-from .transfer import CACHE_SIZE
+from .transfer import CACHE_SIZE, trapezoid_weights
 
 # ---------------------------------------------------------------------------
 # 1. Lensing potential
@@ -75,9 +75,7 @@ def lensing_potential_operator(ells, k_values, tau_save, tau0_ref, dtype=jnp.flo
     k_values = np.asarray(k_values, dtype=np.float64)
     tau_save = np.asarray(tau_save, dtype=np.float64)
     chi = tau0_ref - tau_save
-    weights = np.zeros(len(tau_save))
-    weights[1:] += 0.5 * np.abs(np.diff(chi))
-    weights[:-1] += 0.5 * np.abs(np.diff(chi))
+    weights = trapezoid_weights(chi)
     x = k_values[:, None] * chi[None, :]
     table = np.stack([special.spherical_jn(int(ell), x) * weights for ell in ells])
     return jnp.asarray(table, dtype=dtype)
@@ -180,13 +178,7 @@ def lensing_potential_transfer(
     ).astype(jnp.float64)
     chi_safe = jnp.where(chi > 0.0, chi, 1.0)
     k_chi = (ells_limber[:, None] + 0.5) / chi_safe[None, :]  # (l, chi)
-    dchi = (
-        jnp.zeros_like(chi)
-        .at[1:]
-        .add(0.5 * jnp.abs(jnp.diff(chi)))
-        .at[:-1]
-        .add(0.5 * jnp.abs(jnp.diff(chi)))
-    )
+    dchi = trapezoid_weights(chi, jnp)
     limber = jnp.where(
         chi > 0.0,
         source_at**2 / (k_chi[None] ** 3 * chi_safe[None, None] ** 2) * dchi,
@@ -203,14 +195,7 @@ def lensing_potential_cl_from_transfer(
 
     primordial = A_s[:, None] * (k_values[None, :] / k_pivot) ** (n_s[:, None] - 1.0)
     # Exact projection: C_l = 4 pi int dln k P_R(k) Theta_l(k)^2.
-    lnk = jnp.log(k_values)
-    w = (
-        jnp.zeros_like(lnk)
-        .at[1:]
-        .add(0.5 * jnp.diff(lnk))
-        .at[:-1]
-        .add(0.5 * jnp.diff(lnk))
-    )
+    w = trapezoid_weights(jnp.log(k_values), jnp)
     cl_exact = 4.0 * jnp.pi * jnp.einsum("clk,ck,k->cl", theta_psi**2, primordial, w)
     # Limber: C_l = 2 pi^2 int dchi S(k_chi, chi)^2 P_R(k_chi) / (k_chi^3 chi^2), k_chi = (l + 1/2) / chi.
     chi_safe = jnp.where(chi > 0.0, chi, 1.0)

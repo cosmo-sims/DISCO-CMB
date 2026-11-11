@@ -64,6 +64,17 @@ PROJECTION_BUDGET_BYTES = 1.0e9
 many fine wave modes are contracted together at once."""
 
 
+def trapezoid_weights(x, xp=np):
+    """Weights ``w`` of the trapezoid rule on the samples ``x``: ``int f ~ sum_j w_j f(x_j)``.
+
+    ``xp`` is ``np`` on the host or ``jnp`` under ``jit``. The weights are
+    positive whichever way ``x`` runs.
+    """
+
+    half = 0.5 * xp.abs(xp.diff(x))
+    return xp.pad(half, (0, 1)) + xp.pad(half, (1, 0))
+
+
 def _bessel_row(ell: int, n_x: int, dx: float) -> np.ndarray:
     """Return ``j_ell`` sampled on the uniform grid ``x = 0, dx, ..., dx (n_x-1)``.
 
@@ -249,9 +260,7 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
     inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _build_bessel_tables(
         ells, float(np.max(k_fine) * np.max(chi)) + 2.0, 0.03
     )
-    weights = np.zeros(len(tau_save))
-    weights[1:] += 0.5 * np.diff(tau_save)
-    weights[:-1] += 0.5 * np.diff(tau_save)
+    weights = trapezoid_weights(tau_save)
 
     def rows(i, ell):
         jl = _interp_uniform_table(x, inv_dx, n_x, jl_tab[i])
@@ -280,11 +289,7 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
         [row_e(i, float(ell)).astype(dtype) for i, ell in enumerate(ells)], axis=1
     )
 
-    lnk_weights = np.zeros(len(k_fine))
-    dlnk = np.diff(np.log(k_fine))
-    lnk_weights[1:] += 0.5 * dlnk
-    lnk_weights[:-1] += 0.5 * dlnk
-
+    lnk_weights = trapezoid_weights(np.log(k_fine))
     return ProjectionOperator(
         interp.astype(dtype), bessel, bessel_e, jnp.asarray(lnk_weights)
     )
