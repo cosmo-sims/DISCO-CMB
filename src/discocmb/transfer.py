@@ -90,7 +90,6 @@ def array_cache(function):
     def wrapper(*args):
         return cached(*(key(a) for a in args))
 
-    wrapper.cache_clear = cached.cache_clear
     return wrapper
 
 

@@ -22,9 +22,9 @@ The grids of every step come from :mod:`discocmb.grids`.
 
 from __future__ import annotations
 
+import discoeb as eb
 import jax.numpy as jnp
 import numpy as np
-import discoeb as eb
 
 from .grids import CMBGrids, cmb_grids
 from .lensing import lensing_operators, lensing_potential_transfer

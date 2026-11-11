@@ -42,10 +42,10 @@ speed, and the weight has to reach ``1e4`` at ``k ~ 1e-4`` for EE at
 
 from __future__ import annotations
 
+import discoeb as eb
 import jax
 import jax.numpy as jnp
 import numpy as np
-import discoeb as eb
 from discoeb import Component
 
 SOURCE_CHANNELS = 6

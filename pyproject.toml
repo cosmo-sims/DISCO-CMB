@@ -1,15 +1,29 @@
-[build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "discocmb"
 version = "0.1.0"
 description = "CMB angular power spectra on the GPU from DISCO-EB's Einstein-Boltzmann solve"
 readme = "README.md"
-license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "Lawrence Berry" }, { name = "Oliver Hahn" }]
+authors = [
+    { name = "Lawrence Berry", email = "lawrenceberry@outlook.com" },
+    { name = "Oliver Hahn", email = "oliver.hahn@univie.ac.at" },
+]
+# PEP 639: an SPDX expression and the files themselves. Needs the setuptools
+# pinned below.
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = [
     # The Einstein-Boltzmann solve, through its interface, the discoeb
     # package; DISCO-EB brings JAX, modax and the CUDA stack.
@@ -17,16 +31,40 @@ dependencies = [
     "numpy",
     "scipy",
 ]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Operating System :: POSIX :: Linux",
-    "Topic :: Scientific/Engineering :: Astronomy",
+
+[project.urls]
+Documentation = "https://cosmo-sims.github.io/DISCO-CMB/"
+Source = "https://github.com/cosmo-sims/DISCO-CMB"
+Issues = "https://github.com/cosmo-sims/DISCO-CMB/issues"
+
+[dependency-groups]
+# The docs build (Sphinx, MyST and autodoc) imports the package, so its
+# environment is the project plus this group:
+# `uv sync --no-default-groups --group docs`. Importing needs no GPU.
+docs = [
+    "sphinx>=8.1",
+    "myst-parser>=4.0",
+    "sphinx-book-theme>=1.1",
+    # Grids and dropdowns in MyST pages.
+    "sphinx-design>=0.6",
+    # `sphinx-autobuild docs docs/_build/html` serves the site and rebuilds on save.
+    "sphinx-autobuild>=2024.10",
+]
+dev = [
+    # The CLASS references the tests compare against.
+    "classy>=3.3.4.0",
+    "pre-commit>=4.4.0",
+    "pytest>=9.0.2",
+    "pytest-benchmark>=5.2.3",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.5",
+    # The same type checker CI and the pre-commit hook run.
+    "ty>=0.0.83",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest", "pytest-benchmark", "classy>=3.3.4.0"]
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 # DISCO-EB from the sibling checkout until it is released with this interface.
 [tool.uv.sources]
@@ -40,5 +78,63 @@ constraint-dependencies = [
 ]
 override-dependencies = ["numba>=0.61", "llvmlite>=0.44"]
 
+[tool.semantic_release]
+# python-semantic-release (the `publish` workflow) reads the Conventional
+# Commits since the last `v*` tag, picks the next version, writes it here,
+# updates CHANGELOG.md, commits, tags and builds. Below 1.0.0 a `feat` bumps
+# the minor version and a `fix` or `perf` the patch; with `major_on_zero`
+# false, a breaking change bumps the minor too.
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"
+commit_parser = "conventional"
+commit_message = "chore(release): v{version}"
+allow_zero_version = true
+major_on_zero = false
+# uv.lock records the project's own version, so the build refreshes that one
+# entry and stages it with the release commit. `set -e`: the command is one
+# shell script, and without it a failed step is ignored. The release action
+# runs in a container that sees only this checkout, so the build clones the
+# DISCO-EB that `[tool.uv.sources]` expects beside it.
+build_command = """
+set -e
+[ -d ../DISCO-EB ] || git clone --depth 1 --branch "${DISCOEB_REF:-v2}" \
+    https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
+python -m pip install "uv==0.13.7"
+uv lock --upgrade-package "$PACKAGE_NAME"
+git add uv.lock
+uv build
+"""
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.changelog]
+mode = "update"
+insertion_flag = "<!-- version list -->"
+exclude_commit_patterns = ['^chore\(release\):']
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[tool.ruff.lint]
+# On top of the default `select`, enable import sorting.
+extend-select = ["I"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["discocmb"]
+
+[tool.coverage.run]
+source = ["discocmb"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ty.src]
+# The shipped package is what the type check gates.
+include = ["src/discocmb"]

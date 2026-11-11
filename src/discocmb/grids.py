@@ -14,8 +14,8 @@ from __future__ import annotations
 import functools
 from typing import NamedTuple
 
-import numpy as np
 import discoeb as eb
+import numpy as np
 from discoeb import TAU_START
 from scipy import integrate
 

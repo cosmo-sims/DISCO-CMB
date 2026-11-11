@@ -97,7 +97,7 @@ CL_DERIV_GATE = 2.0e-3
 # polarization error weights sharpened the low-k trajectories' step control,
 # at 1e-3 it is below 5e-4, and the truncation error at 1e-3 is ~1e-6.
 FD_STEP = 1.0e-3
-CONVERGED = dict(rtol=1.0e-6, atol=1.0e-6, max_steps=200_000)
+CONVERGED = {"rtol": 1.0e-6, "atol": 1.0e-6, "max_steps": 200_000}
 """The solver settings of the converged central differences the sensitivities are checked against."""
 
 # A central difference is only checked where the change it measures,
@@ -118,7 +118,8 @@ def _cuda_available() -> bool:
         from numba_cuda_mlir import cuda
 
         return bool(cuda.is_available())
-    except Exception:
+    # Any failure, a missing driver or a broken import, means no GPU tests.
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -224,15 +225,15 @@ def _spectrum_kwargs(cosmologies):
     k_values = cmb_k_grid(
         cosmologies[0], n=CMB_N_K, mode="ode", k_min=1.0e-5, k_max=0.5
     )
-    return dict(
-        grids=cmb_grids(
+    return {
+        "grids": cmb_grids(
             cosmologies[0],
             k_values=k_values,
             ells=TT_ELLS,
             n_save=CMB_N_SAVE,
             n_k_fine=1500,
         )
-    )
+    }
 
 
 def test_projection_reproduces_the_bessel_transfer_of_a_delta_source():
@@ -670,13 +671,13 @@ def test_sources_come_from_the_component_model():
     np.testing.assert_allclose(np.asarray(channels), np.asarray(reference), rtol=1e-12)
 
     # The device function, run as plain Python, point by point, with ``a`` given.
-    host = dict(
-        jit=lambda f: f,
-        cuda=SimpleNamespace(
+    host = {
+        "jit": lambda f: f,
+        "cuda": SimpleNamespace(
             local=SimpleNamespace(array=lambda shape, dtype: np.zeros(shape))
         ),
-        float64=np.float64,
-    )
+        "float64": np.float64,
+    }
     quantities = model.build_function(
         ("m0", "m1", "m2", "phi"),
         inputs=("y", "tau", "a"),

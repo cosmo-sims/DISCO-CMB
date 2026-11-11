@@ -37,7 +37,8 @@ def _cuda_available() -> bool:
         from numba_cuda_mlir import cuda
 
         return bool(cuda.is_available())
-    except Exception:
+    # Any failure, a missing driver or a broken import, means no GPU tests.
+    except Exception:  # noqa: BLE001
         return False
 
 
