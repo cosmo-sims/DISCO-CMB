@@ -15,7 +15,7 @@ every name used is in `discoeb.__all__`).
 The contract is `eb.solve_eb(cosmologies, k, tau, keep=names,
 extra=components)`: named quantities evaluated in the kernel at the save
 times, the line-of-sight sources being the `LineOfSightSources` component
-(`cmb.py`) passed as `extra`; error weights by state name; differentiable in
+(`sources.py`) passed as `extra`; error weights by state name; differentiable in
 `DIFFERENTIABLE_PARAMETERS` or in the nine `DIRECTED_NAMES` inputs passed as
 `inputs=` (`eb.directed_inputs` gives a cosmology's). Grids read
 `background_history`, `density_coefficients` and `conformal_ages`. A change
@@ -52,47 +52,19 @@ only, when it is idle.
 
 ## Modules
 
-1. **cmb.py** - Unlensed TT, TE and EE power spectra by line-of-sight integration
-   - Returns `(ells, cl, dl)` with `cl` and `dl` each a `Spectra` NamedTuple
-     (`tt, te, ee`); the E-mode transfer is the quadrupole source `S_j2`
-     against a fourth Bessel row `sqrt((l+2)!/(l-2)!) j_l(x)/x^2` (CAMB's
-     `sources(2)`), tabulated as `j_l/x^2` directly so it interpolates through
-     `x = 0`. EE within 0.35 percent of CLASS and TE within 0.4 percent of
-     `sqrt(TT EE)` at l = 2..1200 (gate 2 percent, `tests/test_cmb.py`)
-   - The CMB solves pass `polarization_error_weights(cosmology)` -- weights by
-     state name -- to `solve_eb`: the
-     photon quadrupole, `E_2` and the massive-neutrino monopole, dipole and
-     quadrupole of every momentum bin weighted by `clip(1/k, 1, 1e4)` in
-     the error norm. At low k those moments are below the scalar
-     `atol = 1e-4`, and without the weights the low multipoles of EE and TE
-     are 10 to 40 percent low (a 0.3 eV neutrino's EE at l = 2 another 2
-     percent); the weights slow only the low-k trajectories, which are not the
-     launch's critical path, so a batch of 128 costs 10 percent more than
-     unweighted (0.64 s against 0.58 s). The weight was `clip(0.1/k, 1, 1000)`
-     until 2026-11-03, at no cost, but left EE at l = 2 1.2 percent low
-     (grids and save grid do not move it; only the error control does), and
-     the end-to-end lensing test failed its 0.5 percent gate on the l = 2 EE
-     lensing correction, where lensing adds 160 percent. Scalar
-     `rtol = atol = 1e-5` reaches the same accuracy at 1.8x the cost, a
-     scalar `atol = 1e-8` at 6x
-   - `--benchmark-disable` makes `benchmark.pedantic` call its target once
-     with no warm-up round, so a test that deals its warm-up batch and its
-     checked batch out of one iterator checks the wrong batch; the TT test
-     reads `benchmark.disabled` and records the batch it ran
-   - `test_power_spectra_derivatives` differences at a relative step of 1e-3
-     with a resolvability floor of 1e-5 of `D_l`: a step-acceptance flip
-     between the two shifted solves moves `D_l` by ~1e-6 of itself, which at
-     the old 1e-5 step was 7e-3 of the derivative's scale once the weights
-     sharpened the low-k step control (the JVP is within 3e-4 of a converged
-     difference at rtol = atol = 1e-6); the dark-energy density moves EE by
-     no more than that noise, so its polarization entries are not compared
+The pipeline is one module per step, brought together by `main.py`;
+`grids.py` builds the grids they share. Imports run one way: `transfer`
+imports `sources`, `lensing` `transfer`, `spectra` both, `main` all;
+`grids` imports `sources` only.
+
+1. **sources.py** - Line-of-sight source functions and the EB solve that keeps them
    - Sources in CAMB form (monopole + ISW against `j_l`, Doppler against `j_l'`,
      quadrupole/polarization against `j_l''`), evaluated *inside* the modax
      Rodas5P launch: `solve_sources` asks `eb.solve_eb` to keep `SOURCE_KEEP`
      (`m0, m1, m2, phi, opacity, kappa`) at every save, six numbers per save
      and trajectory instead of the 50-component state, so a whole batch is
      one launch with no chunking; the visibility weighting follows on the
-     device (`_channels_from_solution`). The ISW `phi'` is a centered difference of the saved potential:
+     device (`channels_from_solution`). The ISW `phi'` is a centered difference of the saved potential:
      the analytic RHS derivative is exact algebra but amplifies the solver's
      state error tenfold at l=2
    - The visibility comes from a cubic spline of the tabulated opacity whose
@@ -101,34 +73,6 @@ only, when it is idle.
      lowered every C_l by 0.5 percent -- this, not RECFAST, was the "1 percent
      discrepancy" with CLASS (the gauge-invariant photon shear matches CLASS
      to 1e-4 at z=1100; P(k) to 1e-4)
-   - Projection as batched matrix products on grids shared by the batch
-     (`projection_operator`, `theta_ell_batch`): sources shifted in tau onto one
-     chi grid by a 4-point Lagrange stencil (each tau0 differs from the reference
-     by up to ~100 Mpc), refined in ln k by a precomputed spline matrix, and
-     contracted against one weighted table of `j_l`, `j_l'`, `j_l''` on the
-     (k, chi) grid. 0.25 ms per cosmology in float32 (default; 2.6e-4 in D_l),
-     2.3 ms in float64 (`projection_dtype`). Warm: ~0.29 s at N=1, ~0.7 s at
-     N=128 (RTX 4070 SUPER); within 0.25 percent of CLASS at `reio_none` (and
-     `reio_camb` with `tau_reio`) for
-     l = 2..1200, gate 0.5 percent
-   - `cmb_grids(fiducial, ...)` builds the `CMBGrids` (wave modes, multipoles,
-     fine k grid, save grid) once; passed as `grids=` to
-     `compute_cl_power_spectrum_batch` they fix the projection operator across
-     batches (else it is rebuilt per batch, 0.3 s). The save grid ends
-     `TAU_END_MARGIN` (1 percent) past the fiducial's tau0: every cosmology's
-     tau0 must lie below it (`ValueError` otherwise), and the shift onto the
-     fiducial grid costs 2.7e-4 in D_l at 1 percent, 1e-3 at 2, 4e-3 at 5.
-     A fresh 128-batch then costs ~1.0 s (thermo 0.3, kernel 0.6)
-   - Rejected after measurement: FFTLog projection (needs 32768 log-chi points
-     to resolve recombination and is an order of magnitude more work than the
-     table contraction); in-kernel `Theta_l` accumulation (must solve on the
-     1500-mode fine k grid, 10 s at N=128); piecewise-in-tau solves; a saved
-     history with host-side sources
-   - The Bessel table is stored `(n_k_fine, n_ell, 3, n_chi)`, the operand
-     layout of the contraction; the old `(n_ell, 3, n_k_fine, n_chi)` made XLA
-     transpose gigabytes per call
-   - Above l ~ 1500 the unlensed TT is 1 to 3 percent off CLASS (the damping
-     tail is not gated; `test_power_spectra_match_class` stops at 1200)
    - The sources are the `LineOfSightSources` component appended to the
      perturbation model (`source_model(layout, thermal_history)`): `phi` from
      the sums `dgrho`, `dgq`, `dgpi`, the three CAMB-form sources from
@@ -145,8 +89,85 @@ only, when it is idle.
      `Neff`). `cl_power_spectrum_jax` builds the model without the thermal
      history, so a massive-neutrino layout fails there with a `NameError` on
      `rhonu`
+   - The CMB solves pass `polarization_error_weights(cosmology)` -- weights by
+     state name -- to `solve_eb`: the
+     photon quadrupole, `E_2` and the massive-neutrino monopole, dipole and
+     quadrupole of every momentum bin weighted by `clip(1/k, 1, 1e4)` in
+     the error norm. At low k those moments are below the scalar
+     `atol = 1e-4`, and without the weights the low multipoles of EE and TE
+     are 10 to 40 percent low (a 0.3 eV neutrino's EE at l = 2 another 2
+     percent); the weights slow only the low-k trajectories, which are not the
+     launch's critical path, so a batch of 128 costs 10 percent more than
+     unweighted (0.64 s against 0.58 s). The weight was `clip(0.1/k, 1, 1000)`
+     until 2026-11-03, at no cost, but left EE at l = 2 1.2 percent low
+     (grids and save grid do not move it; only the error control does), and
+     the end-to-end lensing test failed its 0.5 percent gate on the l = 2 EE
+     lensing correction, where lensing adds 160 percent. Scalar
+     `rtol = atol = 1e-5` reaches the same accuracy at 1.8x the cost, a
+     scalar `atol = 1e-8` at 6x
 
-2. **lensing.py** - Lensing potential and lensed TT, TE, EE, BB
+2. **grids.py** - Adaptive k and tau grids, shaped by a fiducial cosmology
+   - The grid summary (`tau_star`, `r_s`, `k_D`, ...) reads the opacity from
+     one trajectory of `solve_sources`, the kernel the spectra use, so it
+     compiles nothing new; that is why `grids` imports `sources`
+   - `cmb_grids(fiducial, ...)` builds the `CMBGrids` (wave modes, multipoles,
+     fine k grid, save grid) once; passed as `grids=` to
+     `compute_cl_power_spectrum_batch` they fix the projection operator across
+     batches (else it is rebuilt per batch, 0.3 s). The save grid ends
+     `TAU_END_MARGIN` (1 percent) past the fiducial's tau0: every cosmology's
+     tau0 must lie below it (`ValueError` otherwise), and the shift onto the
+     fiducial grid costs 2.7e-4 in D_l at 1 percent, 1e-3 at 2, 4e-3 at 5.
+     A fresh 128-batch then costs ~1.0 s (thermo 0.3, kernel 0.6)
+
+3. **transfer.py** - Line-of-sight integration: `Theta_l(k)` and `E_l(k)`
+   - Projection as batched matrix products on grids shared by the batch
+     (`projection_operator`, `theta_ell_batch`): sources shifted in tau onto one
+     chi grid by a 4-point Lagrange stencil (each tau0 differs from the reference
+     by up to ~100 Mpc), refined in ln k by a precomputed spline matrix, and
+     contracted against one weighted table of `j_l`, `j_l'`, `j_l''` on the
+     (k, chi) grid. 0.25 ms per cosmology in float32 (default; 2.6e-4 in D_l),
+     2.3 ms in float64 (`projection_dtype`). Warm: ~0.29 s at N=1, ~0.7 s at
+     N=128 (RTX 4070 SUPER); within 0.25 percent of CLASS at `reio_none` (and
+     `reio_camb` with `tau_reio`) for
+     l = 2..1200, gate 0.5 percent
+   - The Bessel table is stored `(n_k_fine, n_ell, 3, n_chi)`, the operand
+     layout of the contraction; the old `(n_ell, 3, n_k_fine, n_chi)` made XLA
+     transpose gigabytes per call
+   - Rejected after measurement: FFTLog projection (needs 32768 log-chi points
+     to resolve recombination and is an order of magnitude more work than the
+     table contraction); in-kernel `Theta_l` accumulation (must solve on the
+     1500-mode fine k grid, 10 s at N=128); piecewise-in-tau solves; a saved
+     history with host-side sources
+
+4. **spectra.py** - Unlensed TT, TE and EE `C_l` and `D_l` from the transfer functions
+   - Returns `(ells, cl, dl)` with `cl` and `dl` each a `Spectra` NamedTuple
+     (`tt, te, ee`); the E-mode transfer is the quadrupole source `S_j2`
+     against a fourth Bessel row `sqrt((l+2)!/(l-2)!) j_l(x)/x^2` (CAMB's
+     `sources(2)`), tabulated as `j_l/x^2` directly so it interpolates through
+     `x = 0`. EE within 0.35 percent of CLASS and TE within 0.4 percent of
+     `sqrt(TT EE)` at l = 2..1200 (gate 2 percent, `tests/test_cmb.py`)
+   - Above l ~ 1500 the unlensed TT is 1 to 3 percent off CLASS (the damping
+     tail is not gated; `test_power_spectra_match_class` stops at 1200)
+
+5. **main.py** - The pipeline: solve, project, spectra, lensing potential
+   - `compute_transfer_batch` (everything before `P_R(k)`),
+     `compute_cl_power_spectrum_batch` (that plus `spectra_from_transfer`),
+     `cl_power_spectrum_jax` (one cosmology, differentiable); the common
+     entry points are re-exported from `discocmb`
+   - `--benchmark-disable` makes `benchmark.pedantic` call its target once
+     with no warm-up round, so a test that deals its warm-up batch and its
+     checked batch out of one iterator checks the wrong batch; the TT test
+     reads `benchmark.disabled` and records the batch it ran
+   - `test_power_spectra_derivatives` differences at a relative step of 1e-3
+     with a resolvability floor of 1e-5 of `D_l`: a step-acceptance flip
+     between the two shifted solves moves `D_l` by ~1e-6 of itself, which at
+     the old 1e-5 step was 7e-3 of the derivative's scale once the weights
+     sharpened the low-k step control (the JVP is within 3e-4 of a converged
+     difference at rtol = atol = 1e-6); the dark-energy density moves EE by
+     no more than that noise, so its polarization entries are not compared
+
+6. **lensing.py** - Lensing potential and lensed TT, TE, EE, BB
+   - Also holds the cached exact/Limber operators (`lensing_operators`)
    - `C_l^{psi psi}` from the saved Weyl potential (`phi` channel) against the
      lensing kernel: exact projection below `LIMBER_LMIN` = 200, Limber above
      (needs solved modes to k ~ 1 Mpc^-1 for l ~ 2500). Requested through

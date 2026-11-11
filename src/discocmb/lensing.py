@@ -4,7 +4,7 @@ Two pieces, both batched over cosmologies:
 
 1. **The lensing potential power spectrum** ``C_l^{psi psi}`` from the Weyl
    potential the perturbation kernel records at the save times (the fourth
-   source channel of :mod:`discocmb.cmb`).  The lensing potential is the
+   source channel of :mod:`discocmb.sources`).  The lensing potential is the
    line-of-sight integral of the Weyl potential against the lensing kernel
    (Lewis & Challinor 2006, eq. 4.6; CAMB's ``sources(3)``):
 
@@ -13,7 +13,7 @@ Two pieces, both batched over cosmologies:
    so ``Theta_l^psi(k) = -2 int dchi W(chi) phi_W(k, tau_0 - chi) j_l(k chi)``
    and ``C_l^{psi psi} = 4 pi int dln k P_R(k) |Theta_l^psi(k)|^2``, with the
    same primordial normalization as the temperature spectrum of
-   :func:`discocmb.cmb.cl_from_theta`.  The kernel is broad in ``chi``, so the
+   :func:`discocmb.spectra.cl_from_theta`.  The kernel is broad in ``chi``, so the
    transfer function is smooth in ``k`` and the modes the hierarchy was solved
    on suffice for the quadrature (no refinement onto the fine grid), and the
    projection is a small matrix product per cosmology
@@ -46,6 +46,7 @@ Two pieces, both batched over cosmologies:
 
 from __future__ import annotations
 
+import functools
 from functools import partial
 from typing import NamedTuple
 
@@ -53,6 +54,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy import special
+
+from .transfer import CACHE_SIZE
 
 # ---------------------------------------------------------------------------
 # 1. Lensing potential
@@ -225,7 +228,7 @@ def lensing_potential_cl(
 
     ``phi`` is the Weyl potential channel ``(n_c, n_k, n_tau)`` on the save
     grid; ``shift_idx`` and ``shift_w`` are each cosmology's stencil onto the
-    shared ``chi`` grid (:func:`discocmb.cmb._lagrange_shift_stencil`), ``chi``
+    shared ``chi`` grid (:func:`discocmb.transfer.lagrange_shift_stencil`), ``chi``
     the shared grid ``(n_chi,)``, ``chi_star`` the comoving distance to each
     cosmology's visibility peak ``(n_c,)``, ``operator`` the table of
     :func:`lensing_potential_operator` for the multipoles projected exactly,
@@ -248,6 +251,37 @@ def lensing_potential_cl(
     )
     return lensing_potential_cl_from_transfer(
         theta_psi, limber, chi, ells_limber, k_values, n_s, A_s, k_pivot
+    )
+
+
+def lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
+    """The exact-projection table and the Limber weights, cached per grids.
+
+    Multipoles below :data:`LIMBER_LMIN` are projected exactly,
+    the rest in the Limber approximation; ``ells`` must be sorted.
+    """
+
+    return _lensing_operators_cached(
+        ells.tobytes(),
+        np.asarray(k_sorted).tobytes(),
+        np.asarray(tau_save).tobytes(),
+        float(tau0_ref),
+        dtype,
+    )
+
+
+@functools.lru_cache(maxsize=CACHE_SIZE)
+def _lensing_operators_cached(ells, k_sorted, tau_save, tau0_ref, dtype):
+    ells, k_sorted, tau_save = (
+        np.frombuffer(ells, np.int64),
+        np.frombuffer(k_sorted, np.float64),
+        np.frombuffer(tau_save, np.float64),
+    )
+    exact, limber = ells[ells < LIMBER_LMIN], ells[ells >= LIMBER_LMIN]
+    return (
+        lensing_potential_operator(exact, k_sorted, tau_save, tau0_ref, dtype),
+        limber_interpolation(limber, k_sorted, tau0_ref - tau_save),
+        limber,
     )
 
 
@@ -486,7 +520,7 @@ def lensed_spectra(
     ``cl_pp`` the lensing potential spectrum, ``(n_c, lmax + 1)`` indexed by
     ``l`` from 0 (the monopole and dipole are ignored; :func:`cl_on_every_ell`
     fills them in from the sampled spectra of
-    :func:`discocmb.cmb.compute_cl_power_spectrum_batch`).  The unlensed
+    :func:`discocmb.main.compute_cl_power_spectrum_batch`).  The unlensed
     spectra must extend a few hundred multipoles past the highest lensed
     multipole wanted.  Cosmologies are processed ``chunk`` at a time: the
     per-cosmology work is an ``(lmax + 1, n_points)`` array of damping factors.

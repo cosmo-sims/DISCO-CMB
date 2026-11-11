@@ -55,7 +55,8 @@ def test_power_spectra_with_reionization_match_class():
 
     import jax
 
-    from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+    from discocmb.grids import cmb_grids, cmb_k_grid
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     jax.config.update("jax_enable_x64", True)
     cosmologies = [

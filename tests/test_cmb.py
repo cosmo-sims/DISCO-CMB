@@ -219,7 +219,7 @@ def _spectrum_kwargs(cosmologies):
     margin past the fiducial's ``tau0`` to cover the batches' spread.
     """
 
-    from discocmb.cmb import cmb_grids, cmb_k_grid
+    from discocmb.grids import cmb_grids, cmb_k_grid
 
     k_values = cmb_k_grid(
         cosmologies[0], n=CMB_N_K, mode="ode", k_min=1.0e-5, k_max=0.5
@@ -241,9 +241,9 @@ def test_projection_reproduces_the_bessel_transfer_of_a_delta_source():
     import jax.numpy as jnp
     from scipy import special
 
-    from discocmb.cmb import (
-        SOURCE_CHANNELS,
-        _lagrange_shift_stencil,
+    from discocmb.sources import SOURCE_CHANNELS
+    from discocmb.transfer import (
+        lagrange_shift_stencil,
         projection_operator,
         theta_ell_batch,
     )
@@ -265,7 +265,7 @@ def test_projection_reproduces_the_bessel_transfer_of_a_delta_source():
     interp, bessel, bessel_e, _ = projection_operator(
         ells, k, k, tau, tau0, dtype=jnp.float64
     )
-    idx, w = _lagrange_shift_stencil(tau, 0.0)
+    idx, w = lagrange_shift_stencil(tau, 0.0)
     band = jnp.ones((1, len(ells), len(k)), dtype=bool)
     theta, theta_e = theta_ell_batch(
         jnp.asarray(channels),
@@ -303,7 +303,7 @@ def test_power_spectra_match_class(n_cosmologies, benchmark):
 
     import jax
 
-    from discocmb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     cosmologies = _perturbed_cosmologies(n_cosmologies)
     kwargs = _spectrum_kwargs(cosmologies)
@@ -360,7 +360,7 @@ def test_power_spectra_match_class_with_massive_neutrinos():
 
     import jax
 
-    from discocmb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     cosmologies = [MASSIVE_NEUTRINO_COSMOLOGY]
     _, _, dl_ours = jax.block_until_ready(
@@ -426,7 +426,7 @@ def test_power_spectra_successive_batches(benchmark):
 
     import jax
 
-    from discocmb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     warm, reference, *batches = _successive_batches(
         2 + SUCCESSIVE_BATCHES, SUCCESSIVE_BATCH_SIZE
@@ -526,7 +526,7 @@ def test_power_spectra_derivatives(benchmark):
     import jax.numpy as jnp
     from discoeb import as_cosmology, density_coefficients
 
-    from discocmb.cmb import cl_power_spectrum_jax
+    from discocmb.main import cl_power_spectrum_jax
 
     cosmology = _perturbed_cosmologies(1)[0]
     kwargs = _spectrum_kwargs([cosmology])
@@ -645,7 +645,7 @@ def test_sources_come_from_the_component_model():
     # White-box: the kernel's parameter rows, which the interface does not expose.
     from discoeb.perturbations import PARAM_COLUMNS, make_params
 
-    from discocmb.cmb import source_model
+    from discocmb.sources import source_model
 
     layout = PerturbationLayout()
     model = source_model(layout)

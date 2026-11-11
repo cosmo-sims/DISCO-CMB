@@ -56,7 +56,8 @@ jax.config.update("jax_enable_x64", True)
 import numpy as np
 from discoeb.perturbations import solve_matter_power_spectrum_batch
 
-from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+from discocmb.grids import cmb_grids, cmb_k_grid
+from discocmb.main import compute_cl_power_spectrum_batch
 
 
 def cosmologies(n, offset):

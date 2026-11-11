@@ -139,7 +139,8 @@ def test_lensing_potential_matches_class():
 
     import jax
 
-    from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+    from discocmb.grids import cmb_grids, cmb_k_grid
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     jax.config.update("jax_enable_x64", True)
     cosmologies = _perturbed_cosmologies(4)
@@ -178,8 +179,9 @@ def test_lensed_spectra_end_to_end_match_class():
     import jax
     from test_cmb import DL_GATE, POL_GATE
 
-    from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+    from discocmb.grids import cmb_grids, cmb_k_grid
     from discocmb.lensing import cl_on_every_ell, lensed_spectra, lensing_tables
+    from discocmb.main import compute_cl_power_spectrum_batch
 
     jax.config.update("jax_enable_x64", True)
     cosmology = _perturbed_cosmologies(1)[0]
