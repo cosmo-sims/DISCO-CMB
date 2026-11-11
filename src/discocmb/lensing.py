@@ -46,7 +46,6 @@ Two pieces, both batched over cosmologies:
 
 from __future__ import annotations
 
-import functools
 from functools import partial
 from typing import NamedTuple
 
@@ -56,7 +55,7 @@ import numpy as np
 from scipy import special
 
 from .transfer import (
-    CACHE_SIZE,
+    array_cache,
     primordial_spectrum,
     shift_onto_chi,
     trapezoid_weights,
@@ -202,29 +201,15 @@ def lensing_potential_cl_from_transfer(
     return jnp.concatenate([cl_exact, cl_limber], axis=1)
 
 
+@array_cache
 def lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
     """The exact-projection table and the Limber weights, cached per grids.
 
     Multipoles below :data:`LIMBER_LMIN` are projected exactly,
-    the rest in the Limber approximation; ``ells`` must be sorted.
+    the rest in the Limber approximation; ``ells`` must be sorted, and every
+    array a NumPy one (the cache key).
     """
 
-    return _lensing_operators_cached(
-        ells.tobytes(),
-        np.asarray(k_sorted).tobytes(),
-        np.asarray(tau_save).tobytes(),
-        float(tau0_ref),
-        dtype,
-    )
-
-
-@functools.lru_cache(maxsize=CACHE_SIZE)
-def _lensing_operators_cached(ells, k_sorted, tau_save, tau0_ref, dtype):
-    ells, k_sorted, tau_save = (
-        np.frombuffer(ells, np.int64),
-        np.frombuffer(k_sorted, np.float64),
-        np.frombuffer(tau_save, np.float64),
-    )
     exact, limber = ells[ells < LIMBER_LMIN], ells[ells >= LIMBER_LMIN]
     return (
         lensing_potential_operator(exact, k_sorted, tau_save, tau0_ref, dtype),

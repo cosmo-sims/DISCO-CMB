@@ -64,6 +64,36 @@ PROJECTION_BUDGET_BYTES = 1.0e9
 many fine wave modes are contracted together at once."""
 
 
+def array_cache(function):
+    """:func:`functools.lru_cache` of :data:`CACHE_SIZE` for a function of NumPy arrays.
+
+    Array arguments are keyed by dtype, shape and contents and handed to
+    ``function`` as read-only copies; other arguments must be hashable.
+    """
+
+    def key(value):
+        if isinstance(value, np.ndarray):
+            return (np.ndarray, value.dtype.str, value.shape, value.tobytes())
+        return value
+
+    def unkey(value):
+        if isinstance(value, tuple) and len(value) == 4 and value[0] is np.ndarray:
+            _, dtype, shape, data = value
+            return np.frombuffer(data, dtype=dtype).reshape(shape)
+        return value
+
+    @functools.lru_cache(maxsize=CACHE_SIZE)
+    def cached(*keys):
+        return function(*(unkey(k) for k in keys))
+
+    @functools.wraps(function)
+    def wrapper(*args):
+        return cached(*(key(a) for a in args))
+
+    wrapper.cache_clear = cached.cache_clear
+    return wrapper
+
+
 def trapezoid_weights(x, xp=np):
     """Weights ``w`` of the trapezoid rule on the samples ``x``: ``int f ~ sum_j w_j f(x_j)``.
 
@@ -104,19 +134,10 @@ def _bessel_row(ell: int, n_x: int, dx: float) -> np.ndarray:
     return values
 
 
-def _build_bessel_tables(ells, x_max: float, dx: float):
-    """Return cached uniform ``j_ell``, ``j_{ell+1}`` and ``j_ell / x^2`` interpolation tables."""
+@array_cache
+def _bessel_tables(ell_arr, x_max, dx):
+    """Uniform ``j_ell``, ``j_{ell+1}`` and ``j_ell / x^2`` interpolation tables to ``x_max``."""
 
-    return _bessel_tables(
-        tuple(np.asarray(ells, dtype=np.int64)),
-        float(np.ceil(x_max / 250.0) * 250.0),
-        float(dx),
-    )
-
-
-@functools.lru_cache(maxsize=CACHE_SIZE)
-def _bessel_tables(ells, x_max, dx):
-    ell_arr = np.asarray(ells, dtype=np.int64)
     n_x = int(np.ceil(x_max / dx)) + 2
     unique = [int(ell) for ell in np.unique(np.concatenate([ell_arr, ell_arr + 1]))]
     # Each row is a few hundred thousand evaluations of scipy's j_nu, which
@@ -251,39 +272,28 @@ def projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype=jnp.fl
     of the ``C_l`` quadrature in ``ln k``.
     """
 
-    ells = np.asarray(ells, dtype=np.int64)
-    k_values = np.asarray(k_values, dtype=np.float64)
-    k_fine = np.asarray(k_fine, dtype=np.float64)
-    tau_save = np.asarray(tau_save, dtype=np.float64)
     return _projection_operator(
-        ells.tobytes(),
-        k_values.tobytes(),
-        k_fine.tobytes(),
-        tau_save.tobytes(),
+        np.asarray(ells, dtype=np.int64),
+        np.asarray(k_values, dtype=np.float64),
+        np.asarray(k_fine, dtype=np.float64),
+        np.asarray(tau_save, dtype=np.float64),
         float(tau0_ref),
         dtype,
     )
 
 
-@functools.lru_cache(maxsize=CACHE_SIZE)
+@array_cache
 def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
-    ells, k_values, k_fine, tau_save = (
-        np.frombuffer(b, dtype=d)
-        for b, d in (
-            (ells, np.int64),
-            (k_values, np.float64),
-            (k_fine, np.float64),
-            (tau_save, np.float64),
-        )
-    )
     interp = spline_interpolation(
         jnp.log(jnp.asarray(k_values)), jnp.eye(len(k_values))
     ).evaluate(jnp.log(jnp.asarray(k_fine)))
 
     chi = tau0_ref - tau_save
     x = jnp.asarray(k_fine)[:, None] * jnp.asarray(chi)[None, :]
-    inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _build_bessel_tables(
-        ells, float(np.max(k_fine) * np.max(chi)) + 2.0, 0.03
+    # x_max rounded up so that nearby grids share one table
+    x_max = float(np.max(k_fine) * np.max(chi)) + 2.0
+    inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _bessel_tables(
+        ells, float(np.ceil(x_max / 250.0) * 250.0), 0.03
     )
     weights = trapezoid_weights(tau_save)
 
