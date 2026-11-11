@@ -29,12 +29,7 @@ import discoeb as eb
 from .grids import CMBGrids, cmb_grids
 from .lensing import lensing_operators, lensing_potential_transfer
 from .sources import channels_from_solution, solve_sources
-from .spectra import (
-    Spectra,
-    dl_power_spectrum,
-    spectra_from_theta,
-    spectra_from_transfer,
-)
+from .spectra import Spectra, spectra_from_transfer
 from .transfer import (
     TransferBatch,
     TransferGrids,
@@ -271,32 +266,14 @@ def cl_power_spectrum_jax(
     recombination history is differentiated along with the hierarchy and the
     densities enter again through the source algebra; no history is stored.
     The grids, the save grid, ``tau0`` and the reionization redshift are held
-    fixed. The solve uses :func:`~discocmb.sources.polarization_error_weights` unless
+    fixed. It is :func:`compute_transfer_batch` and
+    :func:`~discocmb.spectra.spectra_from_transfer` for a batch of one. The solve uses :func:`~discocmb.sources.polarization_error_weights` unless
     ``error_weights`` is given. The projection defaults to ``float64``: the
     ``float32`` matrix products cost 2.6e-4 in ``D_l``, which a derivative of
     the spectrum cannot afford.
     """
 
     cosmology = eb.as_cosmology(cosmology)
-    tau0 = float(eb.conformal_ages(cosmology)[0])
-    if grids is None:
-        grids = cmb_grids(
-            cosmology,
-            k_values=k_values,
-            ells=ells,
-            n_save=n_save,
-            n_k_fine=n_k_fine,
-            k_fine_values=k_fine_values,
-            tau_end=tau0,
-        )
-    k_values, ells, k_fine, tau_save = grids
-    tau0_ref = grids.tau_end
-    if tau0 > tau0_ref * (1.0 + 1.0e-12):
-        raise ValueError(
-            f"tau0 = {tau0:.1f} Mpc lies past the save grid's end {tau0_ref:.1f} Mpc: "
-            "build the grids with a larger tau_end_margin"
-        )
-
     inputs = None
     if densities is not None or thermal is not None:
         own = jnp.asarray(eb.directed_inputs(cosmology)[0])
@@ -306,40 +283,22 @@ def cl_power_spectrum_jax(
                 own[5:] if thermal is None else jnp.asarray(thermal, jnp.float64),
             ]
         )[None]
-    k_sorted = np.sort(np.asarray(k_values, dtype=np.float64))
-    solution = solve_sources(
-        (cosmology,), k_sorted, tau_save, inputs=inputs, **solve_kwargs
+    transfer, tgrids = compute_transfer_batch(
+        (cosmology,),
+        grids=grids,
+        k_values=k_values,
+        ells=ells,
+        n_save=n_save,
+        n_k_fine=n_k_fine,
+        k_fine_values=k_fine_values,
+        projection_dtype=projection_dtype,
+        inputs=inputs,
+        **solve_kwargs,
     )
-    chi_star, channels = channels_from_solution(
-        solution.values, jnp.asarray(tau_save), jnp.asarray([tau0])
-    )
-
-    interp, bessel, bessel_e, lnk_weights = projection_operator(
-        ells, k_sorted, k_fine, tau_save, tau0_ref, projection_dtype
-    )
-    ells_d = jnp.asarray(ells, dtype=jnp.float64)
-    k_fine_d = jnp.asarray(k_fine)
-    idx, w = lagrange_shift_stencil(tau_save, tau0 - tau0_ref)
-    band = k_band(ells_d, k_fine_d, float(tau0_ref - tau_save[0]), chi_star)
-    theta, theta_e = theta_ell_batch(
-        channels,
-        jnp.asarray(tau_save),
-        jnp.asarray(idx)[None],
-        jnp.asarray(w)[None],
-        band,
-        interp,
-        bessel,
-        bessel_e,
-    )
-    cl = spectra_from_theta(
-        theta,
-        theta_e,
-        lnk_weights,
+    cl, dl, _ = spectra_from_transfer(
+        transfer,
+        tgrids,
         jnp.asarray([float(cosmology.n_s)]),
         jnp.asarray([float(cosmology.A_s)]),
-        float(cosmology.k_pivot),
-        k_fine_d,
     )
-    cl = Spectra(*(c[0] for c in cl))
-    dl = Spectra(*(dl_power_spectrum(c, ells_d, float(cosmology.T_cmb)) for c in cl))
-    return ells, cl, dl
+    return tgrids.ells, Spectra(*(c[0] for c in cl)), Spectra(*(d[0] for d in dl))
