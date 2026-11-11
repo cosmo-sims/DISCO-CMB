@@ -87,8 +87,7 @@ def spectra_from_transfer(transfer: TransferBatch, tgrids: TransferGrids, n_s, A
     cl_pp = lensing_potential_cl_from_transfer(
         transfer.theta_psi,
         transfer.limber,
-        tgrids.chi,
-        tgrids.ells_limber,
+        tgrids.k_limber,
         tgrids.k_values,
         n_s,
         A_s,

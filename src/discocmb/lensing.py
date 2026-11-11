@@ -96,6 +96,17 @@ and the Limber one to 0.3 percent above ``l ~ 200``.
 """
 
 
+def limber_wavenumbers(ells, chi):
+    """``k_chi = (l + 1/2) / chi``, ``(n_ell, n_chi)``, the wave number a Limber multipole sees at ``chi``.
+
+    Where ``chi <= 0`` the distance is taken as 1; those points carry no weight.
+    """
+
+    chi = np.asarray(chi, dtype=np.float64)
+    chi_safe = np.where(chi > 0.0, chi, 1.0)
+    return (np.asarray(ells, dtype=np.float64)[:, None] + 0.5) / chi_safe[None, :]
+
+
 def limber_interpolation(ells, k_values, chi):
     """``(n_ell, n_chi, n_k)`` cubic-spline weights in ``ln k`` taking the modes to ``k = (l + 1/2) / chi``.
 
@@ -104,11 +115,9 @@ def limber_interpolation(ells, k_values, chi):
 
     from discoeb.spline_interpolation import spline_interpolation
 
-    ells = np.asarray(ells, dtype=np.float64)
     k_values = np.asarray(k_values, dtype=np.float64)
     chi = np.asarray(chi, dtype=np.float64)
-    chi_safe = np.where(chi > 0.0, chi, 1.0)
-    target = (ells[:, None] + 0.5) / chi_safe[None, :]
+    target = limber_wavenumbers(ells, chi)
     inside = (chi > 0.0)[None, :] & (target >= k_values[0]) & (target <= k_values[-1])
     lnk_t = jnp.log(jnp.asarray(np.where(inside, target, k_values[0])))
     weights = spline_interpolation(
@@ -139,8 +148,7 @@ def lensing_potential_transfer(
     chi_star,
     operator,
     limber_weights,
-    ells_limber,
-    k_values,
+    k_chi,
 ):
     """The primordial-spectrum-independent half of ``C_l^{psi psi}`` for a batch.
 
@@ -151,8 +159,8 @@ def lensing_potential_transfer(
     cosmology's visibility peak ``(n_c,)``, ``operator`` the table of
     :func:`lensing_potential_operator` for the multipoles projected exactly,
     ``limber_weights`` the table of :func:`limber_interpolation` and
-    ``ells_limber`` the multipoles projected in the Limber approximation,
-    ``k_values`` the solved modes in ascending order.
+    ``k_chi`` the :func:`limber_wavenumbers` of the multipoles projected in
+    the Limber approximation.
 
     Returns ``(theta_psi, limber)``: the lensing-potential transfer function
     ``Theta_l(k)`` at the solved modes for the multipoles projected exactly,
@@ -173,7 +181,6 @@ def lensing_potential_transfer(
         "ljk,ckj->clj", limber_weights, source.astype(jnp.float32), precision=hi
     ).astype(jnp.float64)
     chi_safe = jnp.where(chi > 0.0, chi, 1.0)
-    k_chi = (ells_limber[:, None] + 0.5) / chi_safe[None, :]  # (l, chi)
     dchi = trapezoid_weights(chi, jnp)
     limber = jnp.where(
         chi > 0.0,
@@ -185,7 +192,7 @@ def lensing_potential_transfer(
 
 @jax.jit
 def lensing_potential_cl_from_transfer(
-    theta_psi, limber, chi, ells_limber, k_values, n_s, A_s, k_pivot
+    theta_psi, limber, k_chi, k_values, n_s, A_s, k_pivot
 ):
     """``C_l^{psi psi}`` ``(n_c, n_ell_exact + n_ell_limber)`` from :func:`lensing_potential_transfer` and the primordial spectrum."""
 
@@ -194,8 +201,6 @@ def lensing_potential_cl_from_transfer(
     w = trapezoid_weights(jnp.log(k_values), jnp)
     cl_exact = 4.0 * jnp.pi * jnp.einsum("clk,ck,k->cl", theta_psi**2, primordial, w)
     # Limber: C_l = 2 pi^2 int dchi S(k_chi, chi)^2 P_R(k_chi) / (k_chi^3 chi^2), k_chi = (l + 1/2) / chi.
-    chi_safe = jnp.where(chi > 0.0, chi, 1.0)
-    k_chi = (ells_limber[:, None] + 0.5) / chi_safe[None, :]  # (l, chi)
     p_r = primordial_spectrum(k_chi, n_s, A_s, k_pivot)
     cl_limber = 2.0 * jnp.pi**2 * jnp.sum(limber * p_r, axis=-1)
     return jnp.concatenate([cl_exact, cl_limber], axis=1)
@@ -203,7 +208,7 @@ def lensing_potential_cl_from_transfer(
 
 @array_cache
 def lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
-    """The exact-projection table and the Limber weights, cached per grids.
+    """The exact-projection table, the Limber weights and the Limber ``k_chi``, cached per grids.
 
     Multipoles below :data:`LIMBER_LMIN` are projected exactly,
     the rest in the Limber approximation; ``ells`` must be sorted, and every
@@ -211,10 +216,11 @@ def lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
     """
 
     exact, limber = ells[ells < LIMBER_LMIN], ells[ells >= LIMBER_LMIN]
+    chi = tau0_ref - tau_save
     return (
         lensing_potential_operator(exact, k_sorted, tau_save, tau0_ref, dtype),
-        limber_interpolation(limber, k_sorted, tau0_ref - tau_save),
-        limber,
+        limber_interpolation(limber, k_sorted, chi),
+        jnp.asarray(limber_wavenumbers(limber, chi)),
     )
 
 

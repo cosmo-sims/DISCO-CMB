@@ -129,33 +129,27 @@ def compute_transfer_batch(
     )
     if lensing_potential_ells is None:
         transfer = TransferBatch(theta, theta_e, None, None, T_cmb)
-        tgrids = TransferGrids(
-            ells, k_fine_d, lnk_weights, k_pivot, None, None, None, None
-        )
+        tgrids = TransferGrids(ells, k_fine_d, lnk_weights, k_pivot, None, None, None)
         return transfer, tgrids
 
     # 4. The lensing potential's transfer, from the saved Weyl potential.
     ells_pp = np.asarray(lensing_potential_ells, dtype=np.int64)
-    operator, limber_weights, ells_limber = lensing_operators(
+    operator, limber_weights, k_chi = lensing_operators(
         ells_pp, k_sorted, tau_save, tau0_ref, projection_dtype
     )
-    chi = jnp.asarray(tau0_ref - tau_save)
-    ells_limber_d = jnp.asarray(ells_limber, dtype=jnp.float64)
-    k_sorted_d = jnp.asarray(k_sorted)
     theta_psi, limber = lensing_potential_transfer(
         channels[:, 3],
         shift_idx,
         shift_w,
-        chi,
+        jnp.asarray(tau0_ref - tau_save),
         chi_star,
         operator,
         limber_weights,
-        ells_limber_d,
-        k_sorted_d,
+        k_chi,
     )
     transfer = TransferBatch(theta, theta_e, theta_psi, limber, T_cmb)
     tgrids = TransferGrids(
-        ells, k_fine_d, lnk_weights, k_pivot, ells_pp, k_sorted_d, chi, ells_limber_d
+        ells, k_fine_d, lnk_weights, k_pivot, ells_pp, jnp.asarray(k_sorted), k_chi
     )
     return transfer, tgrids
 

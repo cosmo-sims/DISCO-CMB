@@ -413,5 +413,4 @@ class TransferGrids(NamedTuple):
     k_pivot: float
     ells_psi: np.ndarray | None  # the lensing-potential multipoles, exact ones first
     k_values: jax.Array | None  # the solved modes, ascending
-    chi: jax.Array | None  # the shared chi grid
-    ells_limber: jax.Array | None
+    k_limber: jax.Array | None  # (n_ell_limber, n_chi) k_chi of the Limber multipoles
