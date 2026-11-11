@@ -26,22 +26,46 @@ directly.
 
 ## Development
 
-DISCO-EB is a uv path dependency from a checkout beside this one
-(`[tool.uv.sources]`), and with it modax and numba-enzyme from theirs (see
-DISCO-EB's notes; never let a `uv sync` write through a symlinked
-numba-enzyme). Until this project has its own environment, run it in
-the DISCO-DJ III paper scripts' venv, which has DISCO-EB, modax and
-numba-enzyme editable from their checkouts and `classy`:
+The project has its own uv environment (`.venv`, Python 3.13 from
+`.python-version`). DISCO-EB is an editable path dependency from the checkout
+beside this one (`[tool.uv.sources]`); modax-solvers and numba-enzyme-cuda
+come from PyPI through it. The dev group brings pytest, `classy`, ruff, ty
+and pre-commit.
 
 ```bash
-V="$HOME/git/papers/DISCO-DJ III: accelerated CMB inference/scripts/.venv/bin/python"
-PYTHONPATH=src "$V" -m pytest tests
-PYTHONPATH=src "$V" examples/cmb_power_spectra_batch.py
+uv sync
+uv run pytest tests --benchmark-disable
+uv run python examples/cmb_power_spectra_batch.py
+uv run ruff format && uv run ruff check --fix
+uv run ty check                 # scoped to src/discocmb by [tool.ty.src]
+uv run pre-commit install       # ruff, ty, and conventional commit messages
 ```
 
-DISCO-EB's own `.venv` also works with `PYTHONPATH=src:$HOME/git/modax` (it
-holds the modax 0.0.7 wheel, without `Block`), but has no `classy`, so every
-CLASS comparison skips there.
+The ruff and ty versions are pinned three times: in `uv.lock`, as the `rev`s
+in `.pre-commit-config.yaml` and in the `env` of `lint.yml` and `types.yml`.
+Bump them together.
+
+Docs (Sphinx, MyST, autodoc, sphinx-book-theme) build in their own
+environment, without the dev group; autodoc imports `discocmb` without a GPU:
+
+```bash
+export UV_PROJECT_ENVIRONMENT=.venv-docs
+uv sync --no-default-groups --group docs
+uv run --no-sync sphinx-build -W docs docs/_build/html
+```
+
+`docs/` includes the README's sections between its `start:` and `end:`
+markers, so edit those in the README. Keep the site under 1000 words.
+
+CI (`.github/workflows/`) mirrors modax's: `lint`, `types`, `tests`, `docs`
+(GitHub Pages) and `publish` (python-semantic-release on every push to
+`main`, then PyPI by trusted publishing as `discocmb`). Every workflow that
+installs the project first clones `cosmo-sims/DISCO-EB` to `../DISCO-EB` at
+the repository variable `DISCOEB_REF` (default `v2`), and the release build
+command does the same inside its container. `tests` runs on the runner named
+by the variable `GPU_RUNNER` (else `ubuntu-latest`, where the GPU tests
+skip) and writes `discocmb-coverage.json` to the gist `COVERAGE_GIST_ID`
+with the secret `GIST_TOKEN`.
 
 The tests need a CUDA GPU and `classy` for the CLASS references; host-only:
 `tests/test_boundary.py`, `tests/test_lensing.py::test_lensed_spectra_match_class_convolution`

@@ -1,11 +1,32 @@
-.idea/
-docs/_build
-*.egg-info/
-dist/
-build/
-.venv/
+# Python-generated files
 __pycache__/
-*.pyc
+*.py[oc]
+build/
+dist/
+*.egg-info
+
+# Virtual environments
+.venv
+.venv-docs
+
+# Tool caches
 .pytest_cache/
 .ruff_cache/
 .benchmarks/
+
+# Editors
+.idea/
+
+# AI assistants' memory and local settings. AGENTS.md is the tracked guide;
+# CLAUDE.md and GEMINI.md are local symlinks to it.
+CLAUDE.md
+GEMINI.md
+.claude/settings.local.json
+
+# Sphinx build output
+docs/_build/
+
+# Coverage output (pytest --cov); CI uploads coverage.xml as an artifact
+.coverage
+coverage.xml
+htmlcov/
