@@ -1,0 +1,94 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      force_badge:
+        description: >
+          Rewrite the coverage gist even when the percentage is unchanged.
+          The action skips an identical write, so this is what proves the
+          badge path works end to end after rotating GIST_TOKEN.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Nearly every test runs DISCO-EB's CUDA kernel, so the suite wants a GPU
+    # runner. GitHub's GPU-enabled larger runners carry a label chosen when
+    # the runner group is created: set the repository variable `GPU_RUNNER` to
+    # it. Without it the job falls back to an ordinary runner, where every
+    # test needing a device skips itself and only the host-side ones run.
+    # That run is green but says little.
+    runs-on: ${{ vars.GPU_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out DISCO-EB beside this repository
+        # `[tool.uv.sources]` installs discoeb from ../DISCO-EB. The branch is
+        # the repository variable DISCOEB_REF, `v2` without it.
+        run: >
+          git clone --depth 1 --branch "${{ vars.DISCOEB_REF || 'v2' }}"
+          https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Show the device
+        if: vars.GPU_RUNNER != ''
+        run: nvidia-smi
+
+      - name: Install
+        # The dev group brings pytest and classy, which builds CLASS from
+        # source for the reference spectra.
+        run: uv sync --frozen
+
+      - name: Tests
+        run: >
+          uv run --no-sync pytest tests -q --benchmark-disable
+          --cov --cov-report=xml --cov-report=term-missing:skip-covered
+
+      - name: Coverage total
+        id: coverage
+        run: echo "percent=$(uv run --no-sync coverage report --format=total)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        # Kept even when the suite fails, which is when the line-by-line report
+        # is worth having.
+        if: always()
+        with:
+          name: coverage-${{ github.run_id }}
+          path: coverage.xml
+          if-no-files-found: ignore
+
+      - name: Update the coverage badge
+        # Only from main, and only once the gist is set up: a pull request
+        # from a fork gets no secrets. The gist is named by the repository
+        # variable `COVERAGE_GIST_ID` and written with the secret `GIST_TOKEN`,
+        # a token carrying the `gist` scope. Without `GPU_RUNNER` the number
+        # reports the host-side tests only.
+        if: >
+          github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+          && vars.COVERAGE_GIST_ID != ''
+        uses: schneegans/dynamic-badges-action@v1.9.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.COVERAGE_GIST_ID }}
+          filename: discocmb-coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.percent }}%
+          valColorRange: ${{ steps.coverage.outputs.percent }}
+          minColorRange: 50
+          maxColorRange: 90
+          forceUpdate: ${{ inputs.force_badge || false }}

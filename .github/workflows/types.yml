@@ -1,0 +1,42 @@
+name: types
+
+# ty over `src/discocmb`. Its own workflow, apart from `lint.yml`, so the
+# README can carry a badge for it. Nothing here needs a GPU.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: types-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned so a ty release cannot turn main red on its own. Keep in step with
+  # the `rev` in .pre-commit-config.yaml and the floor in pyproject.toml.
+  TY_VERSION: "0.0.100"
+
+jobs:
+  ty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check out DISCO-EB beside this repository
+        # `[tool.uv.sources]` installs discoeb from ../DISCO-EB. The branch is
+        # the repository variable DISCOEB_REF, `v2` without it.
+        run: >
+          git clone --depth 1 --branch "${{ vars.DISCOEB_REF || 'v2' }}"
+          https://github.com/cosmo-sims/DISCO-EB.git ../DISCO-EB
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install the project
+        # ty resolves third-party imports out of an environment, so the
+        # runtime dependencies have to be there even though nothing runs. The
+        # dev group is not, which is why ty comes from uvx below.
+        run: uv sync --frozen --no-default-groups
+      - name: Type check
+        # Scoped to `src/discocmb` by `[tool.ty.src]` in pyproject.toml, which
+        # is also what the pre-commit hook obeys.
+        run: uvx ty@${{ env.TY_VERSION }} check --python .venv --output-format concise
