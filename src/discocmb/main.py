@@ -227,16 +227,6 @@ def compute_cl_power_spectrum_batch(
     return tgrids.ells, cl, dl, cl_pp
 
 
-def compute_cl_power_spectrum(cosmology, **kwargs):
-    """Return ``(ells, C_l, D_l)`` of one cosmology, each spectrum a :class:`~discocmb.spectra.Spectra` of ``(n_ell,)``.
-
-    See :func:`compute_cl_power_spectrum_batch` for the options.
-    """
-
-    ells_out, cl, dl = compute_cl_power_spectrum_batch([cosmology], **kwargs)
-    return ells_out, Spectra(*(c[0] for c in cl)), Spectra(*(d[0] for d in dl))
-
-
 def cl_power_spectrum_jax(
     cosmology,
     densities=None,

@@ -18,7 +18,6 @@ from .grids import CMBGrids, cmb_grids, cmb_k_grid
 from .lensing import cl_on_every_ell, lensed_spectra, lensing_tables
 from .main import (
     cl_power_spectrum_jax,
-    compute_cl_power_spectrum,
     compute_cl_power_spectrum_batch,
     compute_transfer_batch,
 )
@@ -31,7 +30,6 @@ __all__ = [
     "cl_power_spectrum_jax",
     "cmb_grids",
     "cmb_k_grid",
-    "compute_cl_power_spectrum",
     "compute_cl_power_spectrum_batch",
     "compute_transfer_batch",
     "lensed_spectra",

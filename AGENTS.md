@@ -178,8 +178,7 @@ imports `sources`, `lensing` `transfer`, `spectra` both, `main` all;
      all orders, anisotropic to second order in `C_gl,2`), returning lensed
      TT, TE, EE and BB; twelve Wigner d-tables from `lensing_tables(lmax)`
      built once (~600 MB at l = 3000 in float32); sums over every l, so
-     `cl_on_every_ell` splines the sampled spectra. `lensed_tt` is the
-     temperature-only wrapper
+     `cl_on_every_ell` splines the sampled spectra
    - Gates (`tests/test_lensing.py`): the convolution alone reproduces CLASS's
      lensed TT and EE from CLASS's inputs to 5e-4, TE to 3e-4 of
      `sqrt(TT EE)`, BB to 1 percent; `C_l^{psi psi}` within 1 percent of

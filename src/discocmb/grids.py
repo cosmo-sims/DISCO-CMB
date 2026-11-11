@@ -24,9 +24,6 @@ from .sources import solve_sources, visibility_on_grid
 SUMMARY_GRID = 2048
 """Points of the uniform ``log tau`` grid the grid summary reads the opacity on."""
 
-DEFAULT_CMB_K = np.geomspace(1.0e-4, 1.0, 128, dtype=np.float64)
-"""Default perturbation wave modes (Mpc^-1) for a CMB solve."""
-
 DEFAULT_CMB_ELLS = np.unique(
     np.concatenate(
         [np.arange(2, 40, 2), np.arange(40, 200, 5), np.arange(200, 2501, 50)]

@@ -64,14 +64,11 @@ PROJECTION_BUDGET_BYTES = 1.0e9
 many fine wave modes are contracted together at once."""
 
 
-def _bessel_row(ell: int, n_x: int, dx: float, over_x2: bool = False) -> np.ndarray:
+def _bessel_row(ell: int, n_x: int, dx: float) -> np.ndarray:
     """Return ``j_ell`` sampled on the uniform grid ``x = 0, dx, ..., dx (n_x-1)``.
 
     ``j_ell(x)`` is exponentially small below its turning point ``x ~ ell``, so
-    the row is left at zero until ``ell - 4 ell^{1/3}``. With ``over_x2`` the
-    row is ``j_ell(x) / x^2``, the E-mode kernel, which is smooth through
-    ``x = 0`` (``1/15`` there for ``ell = 2``, zero above) and so interpolates
-    accurately where ``j_ell`` itself, divided afterwards, would not.
+    the row is left at zero until ``ell - 4 ell^{1/3}``.
     """
 
     x = np.linspace(0.0, dx * (n_x - 1), n_x)
@@ -81,10 +78,7 @@ def _bessel_row(ell: int, n_x: int, dx: float, over_x2: bool = False) -> np.ndar
     x_min = max(0.0, float(ell) - 4.0 * float(ell) ** (1.0 / 3.0))
     start = max(0, int(x_min / dx) - 1)
     values[start:] = pref[start:] * special.jv(float(ell) + 0.5, x[start:])
-    if over_x2:
-        values = values / x_safe**2
-        values[0] = 1.0 / 15.0 if ell == 2 else 0.0
-    elif ell == 0:
+    if ell == 0:
         values[0] = 1.0
     return values
 
@@ -112,7 +106,6 @@ def _bessel_tables(ells, x_max, dx):
             zip(unique, pool.map(lambda ell: _bessel_row(ell, n_x, dx), unique))
         )
     return (
-        0.0,
         1.0 / dx,
         n_x,
         jnp.asarray(np.stack([rows[int(ell)] for ell in ell_arr])),
@@ -124,7 +117,12 @@ def _bessel_tables(ells, x_max, dx):
 
 
 def _over_x2(row: np.ndarray, ell: int, n_x: int, dx: float) -> np.ndarray:
-    """``j_ell(x) / x^2`` from the ``j_ell`` row, as ``_bessel_row(..., over_x2=True)`` computes it."""
+    """``j_ell(x) / x^2`` from the ``j_ell`` row: the E-mode kernel.
+
+    Smooth through ``x = 0`` (``1/15`` there for ``ell = 2``, zero above), so
+    it interpolates accurately where ``j_ell`` itself, divided afterwards,
+    would not.
+    """
 
     x = np.linspace(0.0, dx * (n_x - 1), n_x)
     x_safe = np.where(x > 1.0e-30, x, 1.0)
@@ -133,10 +131,10 @@ def _over_x2(row: np.ndarray, ell: int, n_x: int, dx: float) -> np.ndarray:
     return values
 
 
-def _interp_uniform_table(x, x0, inv_dx, n_x, vals):
-    """Linearly interpolate a uniformly sampled table at arbitrary ``x``."""
+def _interp_uniform_table(x, inv_dx, n_x, vals):
+    """Linearly interpolate a table sampled uniformly from ``x = 0`` at arbitrary ``x``."""
 
-    u = (x - x0) * inv_dx
+    u = x * inv_dx
     idx = jnp.clip(jnp.floor(u).astype(jnp.int32), 0, n_x - 2)
     frac = jnp.clip(u - idx, 0.0, 1.0)
     return (1.0 - frac) * vals[idx] + frac * vals[idx + 1]
@@ -248,7 +246,7 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
 
     chi = tau0_ref - tau_save
     x = jnp.asarray(k_fine)[:, None] * jnp.asarray(chi)[None, :]
-    x0, inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _build_bessel_tables(
+    inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _build_bessel_tables(
         ells, float(np.max(k_fine) * np.max(chi)) + 2.0, 0.03
     )
     weights = np.zeros(len(tau_save))
@@ -256,8 +254,8 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
     weights[:-1] += 0.5 * np.diff(tau_save)
 
     def rows(i, ell):
-        jl = _interp_uniform_table(x, x0, inv_dx, n_x, jl_tab[i])
-        jl1 = _interp_uniform_table(x, x0, inv_dx, n_x, jl1_tab[i])
+        jl = _interp_uniform_table(x, inv_dx, n_x, jl_tab[i])
+        jl1 = _interp_uniform_table(x, inv_dx, n_x, jl1_tab[i])
         inv_x = jnp.where(x > 1.0e-30, 1.0 / jnp.where(x > 1.0e-30, x, 1.0), 0.0)
         jld = ell * inv_x * jl - jl1
         jldd = -2.0 * inv_x * jld + (ell * (ell + 1.0) * inv_x * inv_x - 1.0) * jl
@@ -265,7 +263,7 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
 
     def row_e(i, ell):
         prefactor = math.sqrt((ell + 2.0) * (ell + 1.0) * ell * (ell - 1.0))
-        jlx2 = _interp_uniform_table(x, x0, inv_dx, n_x, jlx2_tab[i])
+        jlx2 = _interp_uniform_table(x, inv_dx, n_x, jlx2_tab[i])
         return jlx2 * (prefactor * jnp.asarray(weights))
 
     # Stored as (n_k_fine, n_ell, 3, n_chi), the operand layout of the

@@ -17,7 +17,7 @@ Two pieces, both batched over cosmologies:
    transfer function is smooth in ``k`` and the modes the hierarchy was solved
    on suffice for the quadrature (no refinement onto the fine grid), and the
    projection is a small matrix product per cosmology
-   (:func:`lensing_potential_operator`, :func:`lensing_potential_cl`).
+   (:func:`lensing_potential_operator`, :func:`lensing_potential_transfer`).
 
 2. **The lensed spectra** by the full-sky correlation-function method of
    Challinor & Lewis (2005, Phys. Rev. D 71, 103010), the method of CAMB and
@@ -67,7 +67,7 @@ def lensing_potential_operator(ells, k_values, tau_save, tau0_ref, dtype=jnp.flo
 
     ``chi = tau0_ref - tau_save`` is the shared comoving-distance grid the
     sources are shifted onto; the per-cosmology lensing kernel is applied in
-    :func:`lensing_potential_cl`.  Built on the host with SciPy's spherical
+    :func:`lensing_potential_transfer`.  Built on the host with SciPy's spherical
     Bessel functions (a second or so for 60 multipoles and 128 modes).
     """
 
@@ -148,7 +148,17 @@ def lensing_potential_transfer(
     ells_limber,
     k_values,
 ):
-    """The primordial-spectrum-independent half of :func:`lensing_potential_cl`.
+    """The primordial-spectrum-independent half of ``C_l^{psi psi}`` for a batch.
+
+    ``phi`` is the Weyl potential channel ``(n_c, n_k, n_tau)`` on the save
+    grid; ``shift_idx`` and ``shift_w`` are each cosmology's stencil onto the
+    shared ``chi`` grid (:func:`discocmb.transfer.lagrange_shift_stencil`), ``chi``
+    the shared grid ``(n_chi,)``, ``chi_star`` the comoving distance to each
+    cosmology's visibility peak ``(n_c,)``, ``operator`` the table of
+    :func:`lensing_potential_operator` for the multipoles projected exactly,
+    ``limber_weights`` the table of :func:`limber_interpolation` and
+    ``ells_limber`` the multipoles projected in the Limber approximation,
+    ``k_values`` the solved modes in ascending order.
 
     Returns ``(theta_psi, limber)``: the lensing-potential transfer function
     ``Theta_l(k)`` at the solved modes for the multipoles projected exactly,
@@ -208,50 +218,6 @@ def lensing_potential_cl_from_transfer(
     p_r = A_s[:, None, None] * (k_chi[None] / k_pivot) ** (n_s[:, None, None] - 1.0)
     cl_limber = 2.0 * jnp.pi**2 * jnp.sum(limber * p_r, axis=-1)
     return jnp.concatenate([cl_exact, cl_limber], axis=1)
-
-
-def lensing_potential_cl(
-    phi,
-    shift_idx,
-    shift_w,
-    chi,
-    chi_star,
-    operator,
-    limber_weights,
-    ells_limber,
-    k_values,
-    n_s,
-    A_s,
-    k_pivot,
-):
-    """``C_l^{psi psi}`` for a batch of cosmologies, shape ``(n_c, n_ell_exact + n_ell_limber)``.
-
-    ``phi`` is the Weyl potential channel ``(n_c, n_k, n_tau)`` on the save
-    grid; ``shift_idx`` and ``shift_w`` are each cosmology's stencil onto the
-    shared ``chi`` grid (:func:`discocmb.transfer.lagrange_shift_stencil`), ``chi``
-    the shared grid ``(n_chi,)``, ``chi_star`` the comoving distance to each
-    cosmology's visibility peak ``(n_c,)``, ``operator`` the table of
-    :func:`lensing_potential_operator` for the multipoles projected exactly,
-    ``limber_weights`` the table of :func:`limber_interpolation` and
-    ``ells_limber`` the multipoles projected in the Limber approximation,
-    ``k_values`` the solved modes in ascending order.  The composition of
-    :func:`lensing_potential_transfer` and :func:`lensing_potential_cl_from_transfer`.
-    """
-
-    theta_psi, limber = lensing_potential_transfer(
-        phi,
-        shift_idx,
-        shift_w,
-        chi,
-        chi_star,
-        operator,
-        limber_weights,
-        ells_limber,
-        k_values,
-    )
-    return lensing_potential_cl_from_transfer(
-        theta_psi, limber, chi, ells_limber, k_values, n_s, A_s, k_pivot
-    )
 
 
 def lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
@@ -536,10 +502,3 @@ def lensed_spectra(
     one = jax.vmap(_lensed_one, in_axes=(0, 0, 0, 0, None))
     out = jax.lax.map(lambda args: one(*args, tables), tuple(spectra))
     return LensedSpectra(*(c.reshape(-1, n_l)[:n_c] for c in out))
-
-
-def lensed_tt(cl_tt, cl_pp, tables: LensingTables, chunk: int = 4):
-    """Lensed ``C_l^{TT}`` for a batch, shape ``(n_c, lmax + 1)``: :func:`lensed_spectra` without polarization."""
-
-    zeros = jnp.zeros_like(jnp.asarray(cl_tt, dtype=jnp.float64))
-    return lensed_spectra(cl_tt, zeros, zeros, cl_pp, tables, chunk=chunk).tt
