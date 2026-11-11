@@ -246,31 +246,21 @@ def weight_channels(channels, tau_save, tau0):
     return jnp.stack([g * m0, g * m1, g * m2, phi, emk], axis=1)
 
 
-def visibility_peak_times(channels, tau_save, tau0):
-    """``tau_star`` of every cosmology: where its visibility peaks on the save grid.
-
-    From the hook's opacity and optical-depth channels of the first wave mode
-    (the recombination states are the same on every mode of a cosmology), so
-    no stand-alone thermal solve is needed per cosmology. ``(n_cosmo,)``.
-    """
-
-    kappa_prime, kappa = channels[:, 4, 0], channels[:, 5, 0]
-    live = jnp.asarray(tau_save)[None, :] <= jnp.asarray(tau0)[:, None]
-    g = jnp.where(live, kappa_prime * jnp.exp(-(kappa[:, -1:] - kappa)), 0.0)
-    return jnp.asarray(tau_save)[jnp.argmax(g, axis=1)]
-
-
 @jax.jit
 def channels_from_solution(recorded, tau_save, tau0):
     """The kept channels ``(n_cosmo, 6, n_k, n_tau)`` -> ``(chi_star, weighted channels)``, as one program.
 
-    :func:`visibility_peak_times` and :func:`weight_channels` fused: run
-    eagerly, each of their dozen steps was a pass over the batch's gigabyte of
-    sources.
+    :func:`weight_channels` and the distance ``chi_star = tau0 - tau_star`` to
+    where each cosmology's visibility ``g = kappa' exp(-kappa)`` peaks on the
+    save grid, read from the first wave mode (the recombination states are the
+    same on every mode of a cosmology), so no stand-alone thermal solve is
+    needed per cosmology. One jitted program: run eagerly, each of its dozen
+    steps was a pass over the batch's gigabyte of sources.
     """
 
-    chi_star = tau0 - visibility_peak_times(recorded, tau_save, tau0)
-    return chi_star, weight_channels(recorded, tau_save, tau0)
+    weighted = weight_channels(recorded, tau_save, tau0)
+    g = recorded[:, 4, 0] * weighted[:, 4, 0]  # kappa' exp(-kappa), zero past tau0
+    return tau0 - tau_save[jnp.argmax(g, axis=1)], weighted
 
 
 def assemble_sources(channels, tau):
