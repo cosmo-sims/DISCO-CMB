@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="DISCO-CMB logo" src="docs/assets/disco-cmb.png" width="480">
+</p>
+
 <h1 align="center">DISCO-CMB</h1>
 
 <!--
