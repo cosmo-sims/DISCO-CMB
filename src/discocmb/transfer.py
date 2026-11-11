@@ -173,13 +173,15 @@ def _over_x2(row: np.ndarray, ell: int, n_x: int, dx: float) -> np.ndarray:
     return values
 
 
-def _interp_uniform_table(x, inv_dx, n_x, vals):
-    """Linearly interpolate a table sampled uniformly from ``x = 0`` at arbitrary ``x``."""
+def _uniform_stencil(x, inv_dx, n_x):
+    """``(idx, frac)`` that interpolate a table sampled uniformly from ``x = 0`` linearly at ``x``.
+
+    Shared by every table on the same ``x``: ``(1 - frac) vals[idx] + frac vals[idx + 1]``.
+    """
 
     u = x * inv_dx
     idx = jnp.clip(jnp.floor(u).astype(jnp.int32), 0, n_x - 2)
-    frac = jnp.clip(u - idx, 0.0, 1.0)
-    return (1.0 - frac) * vals[idx] + frac * vals[idx + 1]
+    return idx, jnp.clip(u - idx, 0.0, 1.0)
 
 
 @jax.jit
@@ -295,20 +297,24 @@ def _projection_operator(ells, k_values, k_fine, tau_save, tau0_ref, dtype):
     inv_dx, n_x, jl_tab, jl1_tab, jlx2_tab = _bessel_tables(
         ells, float(np.ceil(x_max / 250.0) * 250.0), 0.03
     )
-    weights = trapezoid_weights(tau_save)
+    weights = jnp.asarray(trapezoid_weights(tau_save))
+    # x is the same for every multipole and table: interpolate it once
+    idx, frac = _uniform_stencil(x, inv_dx, n_x)
+    inv_x = jnp.where(x > 1.0e-30, 1.0 / jnp.where(x > 1.0e-30, x, 1.0), 0.0)
+
+    def interpolate(vals):
+        return (1.0 - frac) * vals[idx] + frac * vals[idx + 1]
 
     def rows(i, ell):
-        jl = _interp_uniform_table(x, inv_dx, n_x, jl_tab[i])
-        jl1 = _interp_uniform_table(x, inv_dx, n_x, jl1_tab[i])
-        inv_x = jnp.where(x > 1.0e-30, 1.0 / jnp.where(x > 1.0e-30, x, 1.0), 0.0)
+        jl = interpolate(jl_tab[i])
+        jl1 = interpolate(jl1_tab[i])
         jld = ell * inv_x * jl - jl1
         jldd = -2.0 * inv_x * jld + (ell * (ell + 1.0) * inv_x * inv_x - 1.0) * jl
-        return jnp.stack([jl, jld, jldd]) * jnp.asarray(weights)
+        return jnp.stack([jl, jld, jldd]) * weights
 
     def row_e(i, ell):
         prefactor = math.sqrt((ell + 2.0) * (ell + 1.0) * ell * (ell - 1.0))
-        jlx2 = _interp_uniform_table(x, inv_dx, n_x, jlx2_tab[i])
-        return jlx2 * (prefactor * jnp.asarray(weights))
+        return interpolate(jlx2_tab[i]) * (prefactor * weights)
 
     # Stored as (n_k_fine, n_ell, 3, n_chi), the operand layout of the
     # contraction in :func:`theta_ell_batch`: with (n_ell, 3, n_k_fine, n_chi)
