@@ -11,8 +11,8 @@ license = { file = "LICENSE" }
 requires-python = ">=3.10"
 authors = [{ name = "Lawrence Berry" }, { name = "Oliver Hahn" }]
 dependencies = [
-    # The Einstein-Boltzmann solve, through its interface discoeb.eb; DISCO-EB
-    # brings JAX, modax and the CUDA stack.
+    # The Einstein-Boltzmann solve, through its interface, the discoeb
+    # package; DISCO-EB brings JAX, modax and the CUDA stack.
     "discoeb",
     "numpy",
     "scipy",
@@ -28,7 +28,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = ["pytest", "pytest-benchmark", "classy>=3.3.4.0"]
 
-# DISCO-EB from the sibling checkout until it is released with discoeb.eb.
+# DISCO-EB from the sibling checkout until it is released with this interface.
 [tool.uv.sources]
 discoeb = { path = "../DISCO-EB", editable = true }
 

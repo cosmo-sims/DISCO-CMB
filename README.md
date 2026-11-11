@@ -9,8 +9,9 @@ Einstein-Boltzmann solve of [DISCO-EB](https://github.com/ohahn/DISCO-EB):
   correlation-function method (`discocmb.lensing`);
 - derivatives of the spectra through JAX (`cl_power_spectrum_jax`).
 
-DISCO-CMB uses DISCO-EB through its interface `discoeb.eb` alone. It was
-split out of DISCO-EB, whose history of these modules it keeps.
+DISCO-CMB uses DISCO-EB through its interface, the `discoeb` package
+itself. It was split out of DISCO-EB, whose history of these modules it
+keeps.
 
 ```python
 from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch

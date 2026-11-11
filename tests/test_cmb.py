@@ -524,7 +524,7 @@ def test_power_spectra_derivatives(benchmark):
 
     import jax
     import jax.numpy as jnp
-    from discoeb.eb import as_cosmology, density_coefficients
+    from discoeb import as_cosmology, density_coefficients
 
     from discocmb.cmb import cl_power_spectrum_jax
 
@@ -640,7 +640,7 @@ def test_sources_come_from_the_component_model():
 
     import jax.numpy as jnp
     from cosmologies import REFERENCE_COSMOLOGY
-    from discoeb.eb import PerturbationLayout, as_cosmology
+    from discoeb import PerturbationLayout, as_cosmology
 
     # White-box: the kernel's parameter rows, which the interface does not expose.
     from discoeb.perturbations import PARAM_COLUMNS, make_params

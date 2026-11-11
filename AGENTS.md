@@ -8,9 +8,10 @@ and `lensing.py`, whose history this repository keeps) on 2026-11-11.
 
 ## The boundary with DISCO-EB
 
-`discocmb` imports from DISCO-EB's interface `discoeb.eb` and the generic
-`discoeb.spline_interpolation`, nothing else (`tests/test_boundary.py` checks
-the import statements and that every `eb.` name used is in `eb.__all__`).
+`discocmb` imports from DISCO-EB's interface, the `discoeb` package itself
+(as `import discoeb as eb`), and the generic `discoeb.spline_interpolation`,
+nothing else (`tests/test_boundary.py` checks the import statements and that
+every name used is in `discoeb.__all__`).
 The contract is `eb.solve_eb(cosmologies, k, tau, keep=names,
 extra=components)`: named quantities evaluated in the kernel at the save
 times, the line-of-sight sources being the `LineOfSightSources` component
@@ -19,7 +20,7 @@ times, the line-of-sight sources being the `LineOfSightSources` component
 `inputs=` (`eb.directed_inputs` gives a cosmology's). Grids read
 `background_history`, `density_coefficients` and `conformal_ages`. A change
 here that seems to need a private DISCO-EB name should add to DISCO-EB's
-`eb.py` instead. Only the white-box test
+`__init__.py` instead. Only the white-box test
 `test_sources_come_from_the_component_model` reads `discoeb.perturbations`
 directly.
 

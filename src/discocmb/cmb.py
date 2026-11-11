@@ -47,9 +47,9 @@ has to reach ``1e4`` at ``k ~ 1e-4`` for EE at ``l = 2`` to come within
 
 
 **Where the sources are evaluated.** Inside the Einstein-Boltzmann launch,
-through :mod:`discoeb.eb`, the only part of the Einstein-Boltzmann code this
+through :mod:`discoeb`, the only part of the Einstein-Boltzmann code this
 module uses: the sources are a :class:`LineOfSightSources` component of the
-model, and :func:`solve_sources` asks :func:`~discoeb.eb.solve_eb` to keep
+model, and :func:`solve_sources` asks :func:`~discoeb.solve_eb` to keep
 them, with the opacity and the optical depth, at every save time; the kernel
 evaluates them from the dense-output state and returns six numbers per save
 and trajectory instead of the ``nvar``-component history, so all cosmologies
@@ -90,8 +90,8 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 import numpy as np
-from discoeb import eb
-from discoeb.eb import TAU_START, Component
+import discoeb as eb
+from discoeb import TAU_START, Component
 from discoeb.spline_interpolation import spline_interpolation
 from scipy import integrate, special
 
@@ -233,7 +233,7 @@ def polarization_error_weights(cosmology) -> dict:
     ``test_power_spectra_match_class_with_massive_neutrinos``).
 
     The weights are named by the cosmology's state names
-    (:func:`discoeb.eb.state_names`), the form :func:`discoeb.eb.solve_eb`
+    (:func:`discoeb.state_names`), the form :func:`discoeb.solve_eb`
     takes as ``error_weights``.
     """
 
@@ -1009,7 +1009,7 @@ def cmb_grids(
 # =============================================================================
 #
 # The Einstein-Boltzmann launch evaluates any quantity of its model at every
-# save time from the dense-output state (discoeb.eb.solve_eb), so the sources
+# save time from the dense-output state (discoeb.solve_eb), so the sources
 # are kept in the kernel and the launch returns six numbers per save instead of
 # the ``nvar``-component history; the projection proceeds on the device.
 
@@ -1029,7 +1029,7 @@ of saved potentials cancels that error, so :func:`assemble_sources` differences
 def solve_sources(cosmologies, k_values, tau_save, *, inputs=None, **solve_kwargs):
     """The source channels of a batch, ``EBSolution.values`` of ``(n_cosmo, 6, n_k, n_tau)``.
 
-    One :func:`discoeb.eb.solve_eb` launch keeping :data:`SOURCE_KEEP`, with
+    One :func:`discoeb.solve_eb` launch keeping :data:`SOURCE_KEEP`, with
     :class:`LineOfSightSources` appended to the model; ``tau_save`` starts at
     ``TAU_START``. Unless ``solve_kwargs`` carries ``error_weights``, the
     launch uses :func:`polarization_error_weights`. ``inputs`` are the
@@ -1393,7 +1393,7 @@ def cl_power_spectrum_jax(
     shape ``(n_ell,)``). ``densities`` (the five background densities
     ``grhog, grhornomass, grhoc, grhob, grhov``) and ``thermal`` (``YHe,
     Tcmb, H0, Omegab``) -- together the Einstein-Boltzmann part's directed
-    inputs (:data:`discoeb.eb.DIRECTED_NAMES`) -- default to the cosmology's
+    inputs (:data:`discoeb.DIRECTED_NAMES`) -- default to the cosmology's
     own; given as JAX values, the spectra are differentiable in them. The
     derivative is formed in the kernel: :func:`solve_sources` keeps the
     sources and, for a tangent, their derivatives along each input, by the
