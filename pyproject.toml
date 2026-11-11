@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discocmb"
+version = "0.1.0"
+description = "CMB angular power spectra on the GPU from DISCO-EB's Einstein-Boltzmann solve"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Lawrence Berry" }, { name = "Oliver Hahn" }]
+dependencies = [
+    # The Einstein-Boltzmann solve, through its interface discoeb.eb; DISCO-EB
+    # brings JAX, modax and the CUDA stack.
+    "discoeb",
+    "numpy",
+    "scipy",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-benchmark", "classy>=3.3.4.0"]
+
+# DISCO-EB from the sibling checkout until it is released with discoeb.eb.
+[tool.uv.sources]
+discoeb = { path = "../DISCO-EB", editable = true }
+
+# DISCO-EB's pins of the GPU stack; uv applies these from the root project only.
+[tool.uv]
+constraint-dependencies = [
+    "numba-cuda-mlir==0.5.1",
+    "cuda-toolkit==13.2.1; python_version >= '3.11'",
+]
+override-dependencies = ["numba>=0.61", "llvmlite>=0.44"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["discocmb"]

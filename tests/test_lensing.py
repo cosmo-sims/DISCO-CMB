@@ -1,6 +1,6 @@
 """Lensing of the temperature and polarization spectra against CLASS.
 
-Three checks of :mod:`discoeb.lensing`:
+Three checks of :mod:`discocmb.lensing`:
 
 * the lensing convolution alone: CLASS's own unlensed TT, TE, EE and lensing
   potential spectra through :func:`lensed_spectra` must reproduce CLASS's
@@ -23,7 +23,7 @@ Three checks of :mod:`discoeb.lensing`:
 
 import numpy as np
 import pytest
-from test_perturbations import _perturbed_cosmologies
+from cosmologies import _perturbed_cosmologies
 
 LMAX_CLASS = 3500
 LMAX = 3400
@@ -98,7 +98,7 @@ def test_lensed_spectra_match_class_convolution():
     import jax
     import jax.numpy as jnp
 
-    from discoeb.lensing import lensed_spectra, lensing_tables
+    from discocmb.lensing import lensed_spectra, lensing_tables
 
     jax.config.update("jax_enable_x64", True)
     unlensed, lensed = _class_spectra(_perturbed_cosmologies(1)[0])
@@ -139,7 +139,7 @@ def test_lensing_potential_matches_class():
 
     import jax
 
-    from discoeb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+    from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
 
     jax.config.update("jax_enable_x64", True)
     cosmologies = _perturbed_cosmologies(4)
@@ -178,8 +178,8 @@ def test_lensed_spectra_end_to_end_match_class():
     import jax
     from test_cmb import DL_GATE, POL_GATE
 
-    from discoeb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
-    from discoeb.lensing import cl_on_every_ell, lensed_spectra, lensing_tables
+    from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
+    from discocmb.lensing import cl_on_every_ell, lensed_spectra, lensing_tables
 
     jax.config.update("jax_enable_x64", True)
     cosmology = _perturbed_cosmologies(1)[0]

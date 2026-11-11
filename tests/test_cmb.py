@@ -42,7 +42,7 @@ does for ``P(k)``.
 
 import numpy as np
 import pytest
-from test_perturbations import (
+from cosmologies import (
     BATCH_SIZE_CASES,
     DENSITY_NAMES,
     REFERENCE_COSMOLOGY,
@@ -219,7 +219,7 @@ def _spectrum_kwargs(cosmologies):
     margin past the fiducial's ``tau0`` to cover the batches' spread.
     """
 
-    from discoeb.cmb import cmb_grids, cmb_k_grid
+    from discocmb.cmb import cmb_grids, cmb_k_grid
 
     k_values = cmb_k_grid(
         cosmologies[0], n=CMB_N_K, mode="ode", k_min=1.0e-5, k_max=0.5
@@ -241,7 +241,7 @@ def test_projection_reproduces_the_bessel_transfer_of_a_delta_source():
     import jax.numpy as jnp
     from scipy import special
 
-    from discoeb.cmb import (
+    from discocmb.cmb import (
         SOURCE_CHANNELS,
         _lagrange_shift_stencil,
         projection_operator,
@@ -303,7 +303,7 @@ def test_power_spectra_match_class(n_cosmologies, benchmark):
 
     import jax
 
-    from discoeb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.cmb import compute_cl_power_spectrum_batch
 
     cosmologies = _perturbed_cosmologies(n_cosmologies)
     kwargs = _spectrum_kwargs(cosmologies)
@@ -360,7 +360,7 @@ def test_power_spectra_match_class_with_massive_neutrinos():
 
     import jax
 
-    from discoeb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.cmb import compute_cl_power_spectrum_batch
 
     cosmologies = [MASSIVE_NEUTRINO_COSMOLOGY]
     _, _, dl_ours = jax.block_until_ready(
@@ -426,7 +426,7 @@ def test_power_spectra_successive_batches(benchmark):
 
     import jax
 
-    from discoeb.cmb import compute_cl_power_spectrum_batch
+    from discocmb.cmb import compute_cl_power_spectrum_batch
 
     warm, reference, *batches = _successive_batches(
         2 + SUCCESSIVE_BATCHES, SUCCESSIVE_BATCH_SIZE
@@ -524,20 +524,16 @@ def test_power_spectra_derivatives(benchmark):
 
     import jax
     import jax.numpy as jnp
+    from discoeb.eb import as_cosmology, density_coefficients
 
-    from discoeb.cmb import cl_power_spectrum_jax
-    from discoeb.perturbations import (
-        PHYSICAL_DENSITY_COLUMNS,
-        _as_cosmology,
-        density_coefficients,
-    )
+    from discocmb.cmb import cl_power_spectrum_jax
 
     cosmology = _perturbed_cosmologies(1)[0]
     kwargs = _spectrum_kwargs([cosmology])
     densities = jnp.asarray(
-        np.asarray(density_coefficients(_as_cosmology(cosmology)), dtype=np.float64)
+        np.asarray(density_coefficients(as_cosmology(cosmology)), dtype=np.float64)
     )
-    assert densities.shape == (len(PHYSICAL_DENSITY_COLUMNS),)
+    assert densities.shape == (len(DENSITY_NAMES),)
 
     def spectrum(d, **tolerances):
         _, _, dl = cl_power_spectrum_jax(cosmology, d, **tolerances, **kwargs)
@@ -643,15 +639,13 @@ def test_sources_come_from_the_component_model():
     from types import SimpleNamespace
 
     import jax.numpy as jnp
-    from test_perturbations import REFERENCE_COSMOLOGY
+    from cosmologies import REFERENCE_COSMOLOGY
+    from discoeb.eb import PerturbationLayout, as_cosmology
 
-    from discoeb.cmb import source_model
-    from discoeb.perturbations import (
-        PARAM_COLUMNS,
-        PerturbationLayout,
-        _as_cosmology,
-        make_params,
-    )
+    # White-box: the kernel's parameter rows, which the interface does not expose.
+    from discoeb.perturbations import PARAM_COLUMNS, make_params
+
+    from discocmb.cmb import source_model
 
     layout = PerturbationLayout()
     model = source_model(layout)
@@ -660,7 +654,7 @@ def test_sources_come_from_the_component_model():
     y = rng.normal(size=(n_k, n_tau, model.nvar))
     k = np.geomspace(1e-3, 0.3, n_k)
     a = np.geomspace(1e-3, 1e-2, n_tau)
-    params = make_params(_as_cosmology(REFERENCE_COSMOLOGY), k, 14000.0)
+    params = make_params(as_cosmology(REFERENCE_COSMOLOGY), k, 14000.0)
     row = {name: float(params[0, column]) for name, column in PARAM_COLUMNS.items()}
     densities = params[0, :5]
 

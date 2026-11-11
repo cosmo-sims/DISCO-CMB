@@ -36,7 +36,7 @@ interpolated linearly and ``j_2(x) / x^2 -> 1/15`` at the end of the line of
 sight, where a reionized universe still has visibility). Then
 ``C_l^{EE} = 4 pi int dln k P_R E_l^2`` and ``C_l^{TE} = 4 pi int dln k P_R
 Theta_l E_l``; the three spectra are returned together as a :class:`Spectra`
-(``tt, te, ee``). The lensed TE, EE and BB follow in :mod:`discoeb.lensing`.
+(``tt, te, ee``). The lensed TE, EE and BB follow in :mod:`discocmb.lensing`.
 The polarization source is a small state component at low ``k``, below the
 scalar absolute tolerance of the solve, so the CMB solves weight the photon
 quadrupole and ``E_2`` up in the solver's error norm in proportion to ``1/k``
@@ -90,11 +90,10 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 import numpy as np
+from discoeb import eb
+from discoeb.eb import TAU_START, Component
+from discoeb.spline_interpolation import spline_interpolation
 from scipy import integrate, special
-
-from . import eb
-from .eb import TAU_START, Component
-from .spline_interpolation import spline_interpolation
 
 CACHE_SIZE = 8
 """Batches of grids whose projection operators and lensing tables are kept."""
@@ -1171,9 +1170,9 @@ def compute_cl_power_spectrum_batch(
     ``C_l`` holds the unlensed scalar ``tt``, ``te`` and ``ee`` spectra
     (dimensionless, relative to ``T_cmb``) and ``D_l = l(l+1) C_l / 2pi`` the
     same in ``muK^2``. With ``lensing_potential_ells`` the lensing potential
-    spectrum ``C_l^{psi psi}`` at those multipoles (:mod:`discoeb.lensing`) is
+    spectrum ``C_l^{psi psi}`` at those multipoles (:mod:`discocmb.lensing`) is
     returned as a fourth element, ``(N, n_ell_psi)``, from the Weyl potential
-    the same launch recorded; :func:`discoeb.lensing.lensed_spectra` turns the
+    the same launch recorded; :func:`discocmb.lensing.lensed_spectra` turns the
     two into the lensed TT, TE, EE and BB.
 
 
@@ -1331,9 +1330,9 @@ def _compute_transfer_batch(
 
 
 def _lensing_operators(ells, k_sorted, tau_save, tau0_ref, dtype):
-    """The exact-projection table and the Limber weights of :mod:`discoeb.lensing`, cached per grids.
+    """The exact-projection table and the Limber weights of :mod:`discocmb.lensing`, cached per grids.
 
-    Multipoles below :data:`discoeb.lensing.LIMBER_LMIN` are projected exactly,
+    Multipoles below :data:`discocmb.lensing.LIMBER_LMIN` are projected exactly,
     the rest in the Limber approximation; ``ells`` must be sorted.
     """
 

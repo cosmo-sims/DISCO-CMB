@@ -20,7 +20,9 @@ Run from the repository root with the project's environment::
 
 Until modax 0.0.8, which has the Block and Hierarchy API, is released, the
 script imports modax from a local checkout at ~/git/modax (hard-coded below)
-and DISCO-EB from this repository's src/.
+and DISCO-CMB from this repository's src/; DISCO-EB comes from the
+environment (DISCO-EB's own .venv works:
+``../DISCO-EB/.venv/bin/python examples/cmb_power_spectra_batch.py``).
 """
 
 import atexit
@@ -30,7 +32,7 @@ import sys
 import tempfile
 
 # Import modax from the local checkout (the released 0.0.7 lacks the
-# hierarchy API) and DISCO-EB from this repository, ahead of any installed
+# hierarchy API) and DISCO-CMB from this repository, ahead of any installed
 # copies.
 sys.path[:0] = [
     os.path.expanduser("~/git/modax"),
@@ -52,9 +54,9 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import numpy as np
-
-from discoeb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
 from discoeb.perturbations import solve_matter_power_spectrum_batch
+
+from discocmb.cmb import cmb_grids, cmb_k_grid, compute_cl_power_spectrum_batch
 
 
 def cosmologies(n, offset):

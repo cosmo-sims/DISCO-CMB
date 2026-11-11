@@ -4,7 +4,7 @@ Two pieces, both batched over cosmologies:
 
 1. **The lensing potential power spectrum** ``C_l^{psi psi}`` from the Weyl
    potential the perturbation kernel records at the save times (the fourth
-   source channel of :mod:`discoeb.cmb`).  The lensing potential is the
+   source channel of :mod:`discocmb.cmb`).  The lensing potential is the
    line-of-sight integral of the Weyl potential against the lensing kernel
    (Lewis & Challinor 2006, eq. 4.6; CAMB's ``sources(3)``):
 
@@ -13,7 +13,7 @@ Two pieces, both batched over cosmologies:
    so ``Theta_l^psi(k) = -2 int dchi W(chi) phi_W(k, tau_0 - chi) j_l(k chi)``
    and ``C_l^{psi psi} = 4 pi int dln k P_R(k) |Theta_l^psi(k)|^2``, with the
    same primordial normalization as the temperature spectrum of
-   :func:`discoeb.cmb.cl_from_theta`.  The kernel is broad in ``chi``, so the
+   :func:`discocmb.cmb.cl_from_theta`.  The kernel is broad in ``chi``, so the
    transfer function is smooth in ``k`` and the modes the hierarchy was solved
    on suffice for the quadrature (no refinement onto the fine grid), and the
    projection is a small matrix product per cosmology
@@ -97,7 +97,7 @@ def limber_interpolation(ells, k_values, chi):
     Targets outside the solved modes get zero weight (no contribution).
     """
 
-    from .spline_interpolation import spline_interpolation
+    from discoeb.spline_interpolation import spline_interpolation
 
     ells = np.asarray(ells, dtype=np.float64)
     k_values = np.asarray(k_values, dtype=np.float64)
@@ -225,7 +225,7 @@ def lensing_potential_cl(
 
     ``phi`` is the Weyl potential channel ``(n_c, n_k, n_tau)`` on the save
     grid; ``shift_idx`` and ``shift_w`` are each cosmology's stencil onto the
-    shared ``chi`` grid (:func:`discoeb.cmb._lagrange_shift_stencil`), ``chi``
+    shared ``chi`` grid (:func:`discocmb.cmb._lagrange_shift_stencil`), ``chi``
     the shared grid ``(n_chi,)``, ``chi_star`` the comoving distance to each
     cosmology's visibility peak ``(n_c,)``, ``operator`` the table of
     :func:`lensing_potential_operator` for the multipoles projected exactly,
@@ -377,7 +377,7 @@ def cl_on_every_ell(ells, cl, lmax: int, power: int = 1):
     so sample every multipole there.
     """
 
-    from .spline_interpolation import spline_interpolation
+    from discoeb.spline_interpolation import spline_interpolation
 
     ells = np.asarray(ells, dtype=np.float64)
     if ells[-1] < lmax:
@@ -486,7 +486,7 @@ def lensed_spectra(
     ``cl_pp`` the lensing potential spectrum, ``(n_c, lmax + 1)`` indexed by
     ``l`` from 0 (the monopole and dipole are ignored; :func:`cl_on_every_ell`
     fills them in from the sampled spectra of
-    :func:`discoeb.cmb.compute_cl_power_spectrum_batch`).  The unlensed
+    :func:`discocmb.cmb.compute_cl_power_spectrum_batch`).  The unlensed
     spectra must extend a few hundred multipoles past the highest lensed
     multipole wanted.  Cosmologies are processed ``chunk`` at a time: the
     per-cosmology work is an ``(lmax + 1, n_points)`` array of damping factors.
