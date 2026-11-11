@@ -71,11 +71,14 @@ def dl_power_spectrum(cl, ells, T_cmb):
 def spectra_from_transfer(transfer: TransferBatch, tgrids: TransferGrids, n_s, A_s):
     """``(C_l, D_l, C_l^{psi psi} or None)`` of a :class:`~discocmb.transfer.TransferBatch` for primordial spectra ``A_s (k / k_pivot)^(n_s - 1)``, ``(n_c,)`` each."""
 
-    args = (tgrids.lnk_weights, n_s, A_s, tgrids.k_pivot, tgrids.k_fine)
-    cl = Spectra(
-        cl_from_theta(transfer.theta, *args),
-        cl_from_theta(transfer.theta, *args, theta2=transfer.theta_e),
-        cl_from_theta(transfer.theta_e, *args),
+    cl = spectra_from_theta(
+        transfer.theta,
+        transfer.theta_e,
+        tgrids.lnk_weights,
+        n_s,
+        A_s,
+        tgrids.k_pivot,
+        tgrids.k_fine,
     )
     ells_d = jnp.asarray(tgrids.ells, dtype=jnp.float64)
     dl = Spectra(*(dl_power_spectrum(c, ells_d, transfer.T_cmb[:, None]) for c in cl))
