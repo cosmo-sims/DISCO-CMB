@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use DISCO-CMB in your research, please cite it as below."
+title: DISCO-CMB
+type: software
+authors:
+  - family-names: Berry
+    given-names: Lawrence
+  - family-names: Hahn
+    given-names: Oliver
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/cosmo-sims/DISCO-CMB"
+url: "https://cosmo-sims.github.io/DISCO-CMB/"
