@@ -55,7 +55,7 @@ import jax.numpy as jnp
 import numpy as np
 from scipy import special
 
-from .transfer import CACHE_SIZE, trapezoid_weights
+from .transfer import CACHE_SIZE, primordial_spectrum, trapezoid_weights
 
 # ---------------------------------------------------------------------------
 # 1. Lensing potential
@@ -193,14 +193,14 @@ def lensing_potential_cl_from_transfer(
 ):
     """``C_l^{psi psi}`` ``(n_c, n_ell_exact + n_ell_limber)`` from :func:`lensing_potential_transfer` and the primordial spectrum."""
 
-    primordial = A_s[:, None] * (k_values[None, :] / k_pivot) ** (n_s[:, None] - 1.0)
+    primordial = primordial_spectrum(k_values, n_s, A_s, k_pivot)
     # Exact projection: C_l = 4 pi int dln k P_R(k) Theta_l(k)^2.
     w = trapezoid_weights(jnp.log(k_values), jnp)
     cl_exact = 4.0 * jnp.pi * jnp.einsum("clk,ck,k->cl", theta_psi**2, primordial, w)
     # Limber: C_l = 2 pi^2 int dchi S(k_chi, chi)^2 P_R(k_chi) / (k_chi^3 chi^2), k_chi = (l + 1/2) / chi.
     chi_safe = jnp.where(chi > 0.0, chi, 1.0)
     k_chi = (ells_limber[:, None] + 0.5) / chi_safe[None, :]  # (l, chi)
-    p_r = A_s[:, None, None] * (k_chi[None] / k_pivot) ** (n_s[:, None, None] - 1.0)
+    p_r = primordial_spectrum(k_chi, n_s, A_s, k_pivot)
     cl_limber = 2.0 * jnp.pi**2 * jnp.sum(limber * p_r, axis=-1)
     return jnp.concatenate([cl_exact, cl_limber], axis=1)
 

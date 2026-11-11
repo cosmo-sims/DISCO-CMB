@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 
 from .lensing import lensing_potential_cl_from_transfer
-from .transfer import TransferBatch, TransferGrids
+from .transfer import TransferBatch, TransferGrids, primordial_spectrum
 
 
 class Spectra(NamedTuple):
@@ -42,7 +42,7 @@ def cl_from_theta(theta, lnk_weights, n_s, A_s, k_pivot, k_fine, theta2=None):
     The auto spectrum of ``theta`` by default; the cross spectrum with ``theta2``.
     """
 
-    primordial = A_s[:, None] * (k_fine[None, :] / k_pivot) ** (n_s[:, None] - 1.0)
+    primordial = primordial_spectrum(k_fine, n_s, A_s, k_pivot)
     product = theta**2 if theta2 is None else theta * theta2
     return 4.0 * jnp.pi * jnp.einsum("clf,cf,f->cl", product, primordial, lnk_weights)
 

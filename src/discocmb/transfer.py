@@ -75,6 +75,16 @@ def trapezoid_weights(x, xp=np):
     return xp.pad(half, (0, 1)) + xp.pad(half, (1, 0))
 
 
+def primordial_spectrum(k, n_s, A_s, k_pivot):
+    """``P_R(k) = A_s (k / k_pivot)^(n_s - 1)`` of a batch, shape ``(n_c, *k.shape)``.
+
+    ``n_s`` and ``A_s`` are ``(n_c,)``; ``k`` is any array of wave numbers.
+    """
+
+    batch = (slice(None),) + (None,) * jnp.ndim(k)
+    return A_s[batch] * (k / k_pivot) ** (n_s[batch] - 1.0)
+
+
 def _bessel_row(ell: int, n_x: int, dx: float) -> np.ndarray:
     """Return ``j_ell`` sampled on the uniform grid ``x = 0, dx, ..., dx (n_x-1)``.
 
